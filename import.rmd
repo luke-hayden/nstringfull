@@ -1,0 +1,101 @@
+---
+title: "import"
+author: "Luke Hayden"
+date: "July 20, 2018"
+output: html_document
+---
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+library(NanoStringNorm)
+library(dplyr)
+library(ggbiplot)
+````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+setwd("~/Documents/nstringjul18/1011")
+ct1011.raw <- read.markup.RCC()
+
+
+setwd("~/Documents/nstringjul18/1213")
+ct1213.raw <- read.markup.RCC()
+
+
+setwd("~/Documents/nstringjul18/14")
+ct14.raw <- read.markup.RCC()
+
+
+setwd("~/Documents/nstringjul18/15")
+ct15.raw <- read.markup.RCC()
+
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+ctg1011.norm <- NanoStringNorm(x = ct1011.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg1213.norm <- NanoStringNorm(x = ct1213.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg14.norm <- NanoStringNorm(x = ct14.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg15.norm <- NanoStringNorm(x = ct15.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ct1015.norm <- rownames_to_column(as.data.frame(cbind(ctg1011.norm,ctg1213.norm, ctg14.norm)) )%>%
+  left_join(rownames_to_column(as.data.frame(ctg15.norm)))
+
+rownames(ct1015.norm) <- ct1015.norm$marker
+ct1015.norm$marker <- NULL
+
+sampleinfo <- read.csv("jul18si.csv")
+
+
+
+load(file="nov17main_data.rdata")
+load(file="markerchoiceinfo.rdata")
+
+
+ctall.norm <- cbind(ctg1to9, ct1015.norm)
+
+colnames(ct1015.norm) <- sampleinfo2$sample
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+log <- sampleinfo$reg == "" & sampleinfo$age != "N" & sampleinfo$ctg !=15 & sampleinfo$exp == "Size-age" & !(sampleinfo$sample %in% c("C", "T", "U", "D"))
+
+bcmin <- ct1015.norm[,log== TRUE]
+bcmin.groups <- subset(sampleinfo$type, log==TRUE)
+#bcmin <- subset(bcmin, rownames(bcmin) %in% minf$name[minf$chosenand ==T] )
+tbc <- t(bcmin)
+tbc <- tbc[,colSums(tbc) > 0]
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+ggtitle("PCA of Old vs Young (females)")+
+    theme_minimal() +
+#  scale_colour_manual(values=c("cornflower blue", "red3", "black"))+
+  theme(plot.title=element_text(size=8,face="bold"))
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+load(file="nov17main_data.rdata")
+load(file="markerchoiceinfo.rdata")
+
+````
