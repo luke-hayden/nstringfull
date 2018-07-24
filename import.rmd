@@ -11,6 +11,8 @@ output: html_document
 library(NanoStringNorm)
 library(dplyr)
 library(ggbiplot)
+library(tibble)
+library(tidyr)
 ````
 
 
@@ -52,9 +54,59 @@ ct1015.norm <- rownames_to_column(as.data.frame(cbind(ctg1011.norm,ctg1213.norm,
   left_join(rownames_to_column(as.data.frame(ctg15.norm)))
 
 rownames(ct1015.norm) <- ct1015.norm$marker
-ct1015.norm$marker <- NULL
+ct1015.norm$rowname <- NULL
+```
 
-sampleinfo <- read.csv("jul18si.csv")
+#Internal controls only
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+ctg1011.intonly <- NanoStringNorm(x = ct1011.raw, anno = NA, CodeCount ='sum', Background ="mean",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+
+ctg1213.intonly <- NanoStringNorm(x = ct1213.raw, anno = NA, CodeCount ='sum', Background ="mean",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ctg14.intonly <- NanoStringNorm(x = ct14.raw, anno = NA, CodeCount ='sum', Background ="mean",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ctg15.intonly <- NanoStringNorm(x = ct15.raw, anno = NA, CodeCount ='sum', Background ="mean",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ct1015.intonly <- rownames_to_column(as.data.frame(cbind(ctg1011.intonly,ctg1213.intonly, ctg14.intonly)) )%>%
+  left_join(rownames_to_column(as.data.frame(ctg15.intonly)))
+
+rownames(ct1015.intonly) <- ct1015.intonly$marker
+ct1015.intonly$rowname <- NULL
+
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+ctg1011.unnorm <- NanoStringNorm(x = ct1011.raw, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg1213.unnorm <- NanoStringNorm(x = ct1213.raw, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg14.unnorm <- NanoStringNorm(x = ct14.raw, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg15.unnorm <- NanoStringNorm(x = ct15.raw, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ct1015.unnorm <- rownames_to_column(as.data.frame(cbind(ctg1011.unnorm,ctg1213.unnorm, ctg14.unnorm)) )%>%
+  left_join(rownames_to_column(as.data.frame(ctg15.unnorm)))
+
+rownames(ct1015.unnorm) <- ct1015.unnorm$marker
+ct1015.unnorm$rowname <- NULL
+```
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+sampleinfo2 <- read.csv("jul18si.csv")
 
 
 
@@ -62,9 +114,56 @@ load(file="nov17main_data.rdata")
 load(file="markerchoiceinfo.rdata")
 
 
-ctall.norm <- cbind(ctg1to9, ct1015.norm)
+ctall.norm <- cbind(ctg1to9, as.matrix(ct1015.norm))
 
-colnames(ct1015.norm) <- sampleinfo2$sample
+
+
+
+sampleinfo <- read.csv("siall.csv")
+colnames(ctall.norm) <- sampleinfo$sample
+
+
+
+  
+  
+log <-rownames(ctall.norm) %in% minf$name[minf$chosenand ==T]
+
+ctallgood.norm <- as.matrix(subset(ctall.norm, log))
+  
+
+````
+
+
+
+
+
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+load(file="nov17main_data.rdata")
+load(file="markerchoiceinfo.rdata")
+
+````
+
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+sampleinfo <- mutate(sampleinfo, key= paste(sample, ctg))
+
+
+posdf <-data.frame( over0reads =  as.numeric(colSums(ctall.norm >0, na.rm=T)),
+                    over10reads =  as.numeric(colSums(ctall.norm >10, na.rm=T)), 
+                   key= sampleinfo$key  )
+
+
+sampleinfo <- left_join(sampleinfo, posdf, by= "key")
+
 
 ````
 
@@ -72,13 +171,48 @@ colnames(ct1015.norm) <- sampleinfo2$sample
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-log <- sampleinfo$reg == "" & sampleinfo$age != "N" & sampleinfo$ctg !=15 & sampleinfo$exp == "Size-age" & !(sampleinfo$sample %in% c("C", "T", "U", "D"))
 
-bcmin <- ct1015.norm[,log== TRUE]
+mc <- melt(ctall.norm/rowMeans(ctall.norm, na.rm=T))
+colnames(mc) <- c("marker", "sample", "expression")
+mc <- left_join(mc, sampleinfo, by= "sample") %>%
+  left_join(posdf, by= "sample") %>%
+  mutate(ctgsamp= paste0(ctg,"  ",  sample, ": ", over10reads  ))
+
+
+
+(p=ggplot(mc, aes(x=marker, y=expression, colour=over0reads)) +geom_point() +
+  facet_wrap(~ctgsamp, ncol=6)+
+    scale_y_log10()+
+    scale_colour_gradient(high="green", low="red2")+
+    theme_minimal()
+  )
+  
+ggsave(plot=p, filename = "qual.pdf", device="pdf", height=40, width=6, limitsize = F)
+  
+
+````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+log <- sampleinfo$reg == "" & 
+  !(sampleinfo$age %in% c("N")) & 
+  sampleinfo$sex == "F"&
+  sampleinfo$exp %in% c("cohorts") & 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB")) &
+#  sampleinfo$over10reads > 100 &
+  sampleinfo$ctg > 2 &
+  sampleinfo$prep == "Luke"
+
+bcmin <- as.matrix(ctallgood.norm[,log== TRUE])
 bcmin.groups <- subset(sampleinfo$type, log==TRUE)
-#bcmin <- subset(bcmin, rownames(bcmin) %in% minf$name[minf$chosenand ==T] )
-tbc <- t(bcmin)
-tbc <- tbc[,colSums(tbc) > 0]
+
+tbc <- as.matrix(t(bcmin))
+
 bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
 bc.groups <- bcmin.groups
 
@@ -86,7 +220,10 @@ bc.groups <- bcmin.groups
 ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+ggtitle("PCA of Old vs Young (females)")+
     theme_minimal() +
 #  scale_colour_manual(values=c("cornflower blue", "red3", "black"))+
-  theme(plot.title=element_text(size=8,face="bold"))
+  theme(plot.title=element_text(size=8,face="bold"))+
+#  geom_label(label=rownames(tbc), aes(colour=bc.groups))+
+  scale_colour_manual(values= c("darkviolet","cornflower blue",  "red2"))
+
 
 ````
 
@@ -95,7 +232,97 @@ ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, v
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
-load(file="nov17main_data.rdata")
-load(file="markerchoiceinfo.rdata")
+
+log <- sampleinfo$reg == "" & 
+  !(sampleinfo$age %in% c("N")) & 
+  sampleinfo$sex == "F"&
+  sampleinfo$exp %in% c("OvY", "Size-age", "cohorts") & 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB", "LFIA")) &
+#  sampleinfo$over10reads > 100 &
+  sampleinfo$ctg > 2 &
+  sampleinfo$ctg <10 &
+  sampleinfo$prep == "Luke"
+
+bcmin <- as.matrix(ctallgood.norm[,log== TRUE])
+bcmin.groups <- subset(sampleinfo$type, log==TRUE)
+tbc <- as.matrix(t(bcmin))
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+ggtitle("PCA of Old vs Young (females)")+
+    theme_minimal() +
+#  scale_colour_manual(values=c("cornflower blue", "red3", "black"))+
+  theme(plot.title=element_text(size=8,face="bold"))+
+#  geom_label(label=rownames(tbc), aes(colour=bc.groups))+
+  scale_colour_manual(values= c("darkviolet","cornflower blue",  "red2"))
+
+log <- sampleinfo$reg == "" & 
+  !(sampleinfo$age %in% c("N")) & 
+  sampleinfo$sex == "F"&
+  sampleinfo$exp %in% c("OvY", "Size-age") & 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB")) &
+  sampleinfo$over10reads >50 &
+  sampleinfo$ctg > 2 &
+  sampleinfo$ctg >9 &
+  sampleinfo$prep == "Luke"
+
+
+rg <-as.matrix(ctallgood.norm[,log== TRUE])
+
+rg.groups <- sampleinfo$type[sampleinfo$sample %in% colnames(rg)]
+
+rg.sc <- scale(t(rg), center= bc.pca$center)
+rg.pred <- rg.sc %*% bc.pca$rotation 
+
+
+rgd.pca <- bc.pca
+rgd.pca$x <- rbind(bc.pca$x, rg.pred)
+                   
+                   
+rgd.groups <- c(as.character(bcmin.groups), as.character(rg.groups) )               
+
+ggbiplot(rgd.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = F, var.axes=FALSE, labels=rownames(rgd.pca$x), groups=rgd.groups, varname.abbrev = TRUE)+   
+  theme_bw() +
+  theme(legend.direction = 'horizontal', legend.position = 'top')+
+  ggtitle("PCA Old vs Young + regenerated projected")
+
+
+
+
+
+
+
+
+````
+
+
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
 
 ````
