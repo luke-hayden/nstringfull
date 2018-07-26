@@ -151,10 +151,10 @@
 150,Run,F,Y,,13,P,,regen,Luke,TRUE,Y,?,5.6,phaw_1
 151,Coh1,F,O,,13,I,,cohorts,Luke,TRUE,O,?,7.6,phaw_1
 152,Coh2,F,O,,13,I,,cohorts,Luke,TRUE,O,?,7,phaw_1
-153,Coh3,F,O,,13,I,,cohorts,Luke,TRUE,O,?,6.2,phaw_1
+153,Coh3,F,M,,13,I,,cohorts,Luke,TRUE,M,?,6.2,phaw_1
 154,Coh4,F,M,,13,I,,cohorts,Luke,TRUE,M,?,6.1,phaw_1
-155,Coh5,F,M,,13,I,,cohorts,Luke,TRUE,M,?,5.9,phaw_1
-156,Coh6,F,M,,13,I,,cohorts,Luke,TRUE,M,?,5.9,phaw_1
+155,Coh5,F,Y,,13,I,,cohorts,Luke,TRUE,Y,?,5.9,phaw_1
+156,Coh6,F,Y,,13,I,,cohorts,Luke,TRUE,Y,?,5.9,phaw_1
 157,Coh7,F,Y,,14,I,,cohorts,Luke,TRUE,Y,?,5.1,phaw_1
 158,Coh8,F,Y,,14,I,,cohorts,Luke,TRUE,Y,?,4.1,phaw_1
 159,Coh9,F,O,,14,I,,cohorts,Luke,TRUE,O,?,9.1,phaw_1

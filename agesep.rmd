@@ -1,0 +1,160 @@
+---
+title: "Aging effect"
+author: "Luke Hayden"
+date: "July 26, 2018"
+output: html_document
+---
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+library(dplyr)
+library(ggbiplot)
+library(tibble)
+library(tidyr)
+````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+setwd("~/Documents/nstringjul18")
+load(file="allns_data.rdata")
+
+````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+log <- sampleinfo$reg == "" & 
+  !(sampleinfo$age %in% c("N")) & 
+  sampleinfo$sex == "F"&
+  sampleinfo$exp %in% c("OvY", "Size-age") & 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8")) &
+ sampleinfo$over10reads > 100 &
+  sampleinfo$ctg > 2 &
+  sampleinfo$prep == "Luke"
+
+bcmin <- as.matrix(ctallgood.norm[,log== TRUE])
+bcmin.groups <- subset(sampleinfo$type, log==TRUE)
+
+tbc <- as.matrix(t(bcmin))
+
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+ggtitle("PCA of Old vs Young (females): 50 chosen markers")+
+    theme_minimal() +
+#  scale_colour_manual(values=c("cornflower blue", "red3", "black"))+
+  theme(plot.title=element_text(size=8,face="bold"))+
+#  geom_label(label=rownames(tbc), aes(colour=bc.groups))+
+  scale_colour_manual(values= c("darkviolet","cornflower blue",  "red2"))
+
+
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- t(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
+  #              sampleinfo$qual == "ok"& 
+                 sampleinfo$exp %in% c("OvY", "Size-age") & 
+                 sampleinfo$ctg>2 & 
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+si <- subset(sampleinfo, sampleinfo$sample %in% colnames(md))
+old <- t(subset(t(md), si$age == "O"))
+young <- t(subset(t(md), si$age == "Y"))
+#regen <- t(subset(t(ctg1to9), sampleinfo$type == "OR" & sampleinfo$qual != "bad"))
+
+
+
+
+
+nmd <- as.data.frame(md/rowMeans(md))
+nmd$name <- rownames(nmd)
+nmd$sname <- substr(nmd$name, 1,2)
+
+oy <- cbind(old, young)
+t.result <-  apply(oy, 1, function (x) t.test(x[1:ncol(old)],x[ncol(old)+1: ncol(oy)]))
+
+
+nmd$p_value <- unlist(lapply(t.result, function(x) x$p.value))
+
+nmd <- left_join(nmd, geneinf, by="name")
+
+
+
+nmd$YvOl2fc <- foldchange2logratio(foldchange(rowMeans(young), rowMeans(old)))
+nmd$ROvOl2fc <- foldchange2logratio(foldchange(rowMeans(regen), rowMeans(old)))
+
+nmd$chosen <- nmd$p_value < 0.05 & sign(nmd$transl2fc) == sign(nmd$YvOl2fc)
+
+
+p=ggplot(nmd, aes(y=p_value, x=YvOl2fc, fill=chosen))  +
+  scale_shape_manual(values=c(21,22))+
+  geom_point(shape=21, colour="black")+ 
+  theme_bw()+
+  scale_fill_manual(values=c("darkgrey", "orange"), name="",breaks=c(T,F), labels=c("chosen markers", "other")) +
+  scale_colour_manual(values=c("red3", "black"))+
+  xlab("Absolute Young vs Old Log2Foldchange") +
+  ylab("Old vs young p-value")+
+  ggtitle(paste(sum(nmd$chosen), " markers: new optimised set"))+
+    geom_hline(linetype=2, yintercept = 0.05)
+  
+
+ggsave(plot=p, filename="whichmark.pdf", device="pdf", height=2.5, width=8)
+
+```
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+nmd$sname <- factor(nmd$sname, levels=nmd$sname[order(nmd$p_value)])
+
+mnmd <- gather(nmd, key=sample, value=normexp, O2a:LFPC)
+mnmd$age <- ifelse(mnmd$sample %in% colnames(young), "young", "old")
+
+
+ggplot(mnmd, aes(x= sname, y=normexp, colour=age)) +
+  theme_minimal()+
+  geom_point(size=3, shape=95)+
+ stat_summary()+
+  scale_y_continuous(trans="log2")+
+  facet_grid(~dir, space="free",scales="free" )+
+#  geom_boxplot(outlier.shape = NA)+
+  scale_colour_manual(values=c("cornflower blue", "red3"))+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size=4))+
+  geom_text(colour="black",label="*", data=nmd,inherit.aes=FALSE,  aes(alpha=chosen, x=sname, y=8))+
+  geom_text(colour="forest green",label="*", data=nmd,inherit.aes=FALSE,  aes(alpha=in61, x=sname, y=9))+
+  scale_alpha_manual(values=c(0,1))+
+  guides(alpha=F)+
+  xlab("Marker") +
+  ylab("Normalised Expression")
+
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````
