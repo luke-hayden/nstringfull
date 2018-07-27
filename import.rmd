@@ -103,26 +103,36 @@ ct1015.unnorm$rowname <- NULL
 ```
 
 
+
+
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-sampleinfo2 <- read.csv("jul18si.csv")
-
 
 
 load(file="nov17main_data.rdata")
 load(file="markerchoiceinfo.rdata")
 
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
 
 ctall.norm <- cbind(ctg1to9, as.matrix(ct1015.norm))
 
+ctall.unnorm <- cbind(ctg1to9un, as.matrix(ct1015.unnorm))
+
+ctall.intonly <- cbind(ctg1to9intonly, as.matrix(ct1015.intonly))
 
 
 
 sampleinfo <- read.csv("siall.csv")
 colnames(ctall.norm) <- sampleinfo$sample
 
+colnames(ctall.unnorm) <- sampleinfo$sample
 
+colnames(ctall.intonly) <- sampleinfo$sample
 
   
   
@@ -141,17 +151,6 @@ ctallgood.norm <- as.matrix(subset(ctall.norm, log))
 
 
 
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-load(file="nov17main_data.rdata")
-load(file="markerchoiceinfo.rdata")
-
-````
-
-
-
-
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 sampleinfo <- mutate(sampleinfo, key= paste(sample, ctg))
@@ -165,32 +164,14 @@ posdf <-data.frame( over0reads =  as.numeric(colSums(ctall.norm >0, na.rm=T)),
 sampleinfo <- left_join(sampleinfo, posdf, by= "key")
 
 
+
+
+save(sampleinfo,ctall.norm,ctallgood.norm, codeset,geneinf,ctall.unnorm, ctall.intonly , file="allns_data.rdata")
+
+
 ````
 
 
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-mc <- melt(ctall.norm/rowMeans(ctall.norm, na.rm=T))
-colnames(mc) <- c("marker", "sample", "expression")
-mc <- left_join(mc, sampleinfo, by= "sample") %>%
-  left_join(posdf, by= "sample") %>%
-  mutate(ctgsamp= paste0(ctg,"  ",  sample, ": ", over10reads  ))
-
-
-
-(p=ggplot(mc, aes(x=marker, y=expression, colour=over0reads)) +geom_point() +
-  facet_wrap(~ctgsamp, ncol=6)+
-    scale_y_log10()+
-    scale_colour_gradient(high="green", low="red2")+
-    theme_minimal()
-  )
-  
-ggsave(plot=p, filename = "qual.pdf", device="pdf", height=40, width=6, limitsize = F)
-  
-
-````
 
 
 
@@ -202,8 +183,8 @@ ggsave(plot=p, filename = "qual.pdf", device="pdf", height=40, width=6, limitsiz
 log <- sampleinfo$reg == "" & 
   !(sampleinfo$age %in% c("N")) & 
   sampleinfo$sex == "F"&
-  sampleinfo$exp %in% c("cohorts") & 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB")) &
+  sampleinfo$exp %in% c("OvY", "Size-age") & 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8")) &
 #  sampleinfo$over10reads > 100 &
   sampleinfo$ctg > 2 &
   sampleinfo$prep == "Luke"
@@ -237,7 +218,7 @@ log <- sampleinfo$reg == "" &
   !(sampleinfo$age %in% c("N")) & 
   sampleinfo$sex == "F"&
   sampleinfo$exp %in% c("OvY", "Size-age", "cohorts") & 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB", "LFIA")) &
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB", "LFIA", "LFIB", "LFIC", "LFID")) &
 #  sampleinfo$over10reads > 100 &
   sampleinfo$ctg > 2 &
   sampleinfo$ctg <10 &
@@ -258,11 +239,11 @@ ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, v
   scale_colour_manual(values= c("darkviolet","cornflower blue",  "red2"))
 
 log <- sampleinfo$reg == "" & 
-  !(sampleinfo$age %in% c("N")) & 
+  !(sampleinfo$age %in% c("N", "M")) & 
   sampleinfo$sex == "F"&
   sampleinfo$exp %in% c("OvY", "Size-age") & 
   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB")) &
-  sampleinfo$over10reads >50 &
+  sampleinfo$over10reads >90 &
   sampleinfo$ctg > 2 &
   sampleinfo$ctg >9 &
   sampleinfo$prep == "Luke"
@@ -280,7 +261,7 @@ rgd.pca <- bc.pca
 rgd.pca$x <- rbind(bc.pca$x, rg.pred)
                    
                    
-rgd.groups <- c(as.character(bcmin.groups), as.character(rg.groups) )               
+rgd.groups <- c(paste(as.character(bcmin.groups), "(old)"), paste(as.character(rg.groups), "(new)" )    )           
 
 ggbiplot(rgd.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = F, var.axes=FALSE, labels=rownames(rgd.pca$x), groups=rgd.groups, varname.abbrev = TRUE)+   
   theme_bw() +
