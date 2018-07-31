@@ -12,6 +12,7 @@ library(dplyr)
 library(ggbiplot)
 library(tibble)
 library(tidyr)
+library(caret)
 
 library(gtools)
 ````
@@ -160,11 +161,12 @@ ggplot(mnmd, aes(x= sname, y=normexp, fill=type))+
 
 
 ggplot(mnmd, aes(x=length, y=normexp))+
-  geom_smooth(method="lm", colour="grey", alpha=0.3, se=F, size=3)+
-  geom_point(aes(colour=type))+
+  geom_point(aes(fill=type), shape=21, colour="white")+
+  geom_smooth(method="lm", aes(colour=dir), alpha=0.3, se=F, size=1)+
   theme_bw()+
- #scale_y_continuous(trans="log2")+
-  scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
+ scale_y_continuous(trans="log2")+
+  scale_colour_manual(values=c("orangered","forest green"))+
+  scale_fill_manual(values=c("darkviolet", "cornflower blue",  "red3"))+
   theme(axis.text.x = element_text(angle = 60, hjust = 1))+
   ylab("Normalised Expression") +
   xlab('Body length')+
@@ -186,8 +188,187 @@ scale_y_continuous(trans="log2")+
   ylab("Normalised Expression") +
   xlab('Body length')+
   facet_wrap(~dir)
+
+library(dplyr)
+case_when(
+  x %in% c("1", "2", "3") ~ "Central Time", 
+  x %in% c("4", "5", "6") ~ "Pacific Time"
+)
+
+
 ```
 
+#Model length vs expression
+All markers as predictors
+Linear regression
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+  #              sampleinfo$qual == "ok"& 
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+                 sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+md$sample <- rownames(md)
+
+md <- left_join(md, select(sampleinfo, sample, length), by="sample") %>%
+  filter(!(is.na(length))) %>%
+  column_to_rownames(var="sample")
+
+
+model <- train(
+  length~., md,
+   method = "lm",
+  trControl = trainControl(
+    method = "cv", number = 5,
+    repeats = 5, verboseIter = TRUE
+  )
+)
+
+model
+
+
+```
+
+
+#Model length vs expression
+50 chosen markers:
+Linear regression
+Random forest
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
+  #              sampleinfo$qual == "ok"& 
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+md$sample <- rownames(md)
+
+md <- left_join(md, select(sampleinfo, sample, length), by="sample") %>%
+  filter(!(is.na(length))) %>%
+  column_to_rownames(var="sample")
+
+
+linmodel <- train(
+  length~., md,
+   method = "lm",
+  trControl = trainControl(
+    method = "cv", number = 5,
+    repeats = 5, verboseIter = TRUE
+  )
+)
+
+
+linmodel <- lm(
+  length~., md
+)
+
+print("linear regression:")
+summary(linmodel)
+#plot(lmodel)
+
+
+(rflinmodel <- train(
+  length~.,
+  tuneLength = 1,
+  data = md, method = "ranger",
+  trControl = trainControl(method = "cv", number = 5, verboseIter = TRUE)
+))
+
+
+print("random forest:")
+model
+plot(rflinmodel)
+
+
+```
+
+Log transformation of the lengths:
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
+  #              sampleinfo$qual == "ok"& 
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+md$sample <- rownames(md)
+
+md <- left_join(md, select(sampleinfo, sample, length), by="sample") %>%
+  filter(!(is.na(length))) %>%
+  column_to_rownames(var="sample")
+
+md$length <- log(md$length)
+
+linlogmodel <- train(
+  length~., md,
+   method = "lm",
+  trControl = trainControl(
+    method = "cv", number = 5,
+    repeats = 5, verboseIter = TRUE
+  )
+)
+
+print("linear regression:")
+linlogmodel
+
+
+rflogmodel <- train(
+  length~.,
+  tuneLength = 4,
+  data = md, method = "ranger",
+  trControl = trainControl(method = "cv", number = 5, verboseIter = TRUE)
+)
+
+
+
+
+print("random forest:")
+rfmodel
+plot(rflogmodel)
+
+md$linpred <- predict(linmodel)
+md$rflinpred <- predict(rflinmodel)
+md$linlogpred <- exp(predict(linlogmodel))
+md$rflogpred <-  exp(predict(rfmodel))
+
+
+
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+preddf <- data.frame(length=md$length , 
+                     sample = rownames(md), 
+
+                     rflinpred = predict(rflinmodel),
+                     linlogpred = exp(predict(linlogmodel)),
+                     rflogpred =  exp(predict(rfmodel))
+)
+
+
+mpreddf <- gather(preddf, key="model", value="prediction", -length, -sample)
+
+
+
+
+ggplot(mpreddf, aes(x=length, y=prediction, colour=model))+
+  geom_point()+
+  facet_wrap(~model, ncol=2)+
+  theme_bw()
+
+
+
+```
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
@@ -253,17 +434,17 @@ ggplot(mnmd, aes(x= sname, y=normexp, fill=type))+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
-ggplot(subset(mnmd), aes(x=length, y=normexp))+
-  geom_smooth(method="lm", colour="grey", alpha=0.3, se=F, size=3)+
-  geom_point(aes(colour=type))+
+ggplot(mnmd, aes(x=length, y=normexp))+
+  geom_point(aes(fill=type), shape=21, colour="white")+
+  geom_smooth(method="lm", aes(colour=dir), alpha=0.3, se=F, size=1)+
   theme_bw()+
-#  scale_y_continuous(trans="log2")+
-  scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
+ scale_y_continuous(trans="log2")+
+  scale_colour_manual(values=c("orangered","forest green"))+
+  scale_fill_manual(values=c("darkviolet", "cornflower blue",  "red3"))+
   theme(axis.text.x = element_text(angle = 60, hjust = 1))+
   ylab("Normalised Expression") +
   xlab('Body length')+
-  facet_wrap(~sname, scales="free")
-
+  facet_wrap(~sname, scales="free_y")
 
 ````
 

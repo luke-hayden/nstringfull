@@ -141,6 +141,11 @@ log <-rownames(ctall.norm) %in% minf$name[minf$chosenand ==T]
 ctallgood.norm <- as.matrix(subset(ctall.norm, log))
   
 
+
+#dates <- sampleinfo$cohdate[sampleinfo$cohdate != ""]
+sampleinfo$cohdate <- parse_date_time(sampleinfo$cohdate,c('dmy'))
+sampleinfo$wkage <- difftime( parse_date_time("07/07/18",c('dmy')), sampleinfo$cohdate, units=c("weeks"))
+
 ````
 
 
