@@ -1,0 +1,200 @@
+---
+title: "age-length"
+author: "Luke Hayden"
+date: "August 1, 2018"
+output: html_document
+---
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+library(dplyr)
+library(ggbiplot)
+library(tibble)
+library(tidyr)
+library(caret)
+
+library(gtools)
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+setwd("~/Documents/nstringjul18")
+load(file="allns_data.rdata")
+zklen <- read.csv("zk-age-len.csv")[2:3] %>%
+  mutate(prep="ZK")
+
+lena <- sampleinfo %>%
+  filter(!is.na(wkage)) %>%
+  select(length, wkage, prep) %>%
+  rbind(zklen)
+
+
+```
+
+#Age-length relationship
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+ggplot(lena, aes(y=length, x=wkage))+
+  geom_point(aes(colour=prep))+
+  geom_smooth()+
+  theme_bw()+
+  scale_colour_brewer(palette="Set1")+
+  ggtitle("Age-length relationship in female Parhyale")+
+  ylab("Body length (mm)")+
+  xlab("Age (weeks)")
+  
+```
+#Model length vs age
+
+We will use the following models:
+
+linear regression: age ~ length
+
+linear regression: age ~ log(length)
+
+linear regression: age ~ length^2
+
+random forest (probably a sledgehammer to crack a nut)
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+lena$wkage <- as.numeric(lena$wkage)
+
+lena$loglen <- log(lena$length)
+lena$lensq <- (lena$length)^2
+
+
+
+linmodel <- train(
+  wkage~length, lena,
+   method = "lm",
+  trControl = trainControl(
+    method = "cv", number = 5,
+    repeats = 5, verboseIter = TRUE
+  )
+)
+
+linmodel
+
+lena$linpred <- predict(linmodel)
+
+lena$linresid <- lena$wkage -lena$linpred
+
+
+logmodel <- train(
+  wkage~loglen, lena,
+   method = "lm",
+  trControl = trainControl(
+    method = "cv", number = 5,
+    repeats = 5, verboseIter = TRUE
+  )
+)
+
+logmodel
+
+lena$logpred <- predict(logmodel)
+
+lena$logresid <-lena$wkage -lena$logpred
+
+sqmodel <- train(
+  wkage~lensq, lena,
+   method = "lm",
+  trControl = trainControl(
+    method = "cv", number = 5,
+    repeats = 5, verboseIter = TRUE
+  )
+)
+
+sqmodel
+
+lena$sqpred <- predict(sqmodel)
+lena$sqresid <- lena$wkage -lena$sqpred
+
+
+rfmodel <- train(
+  wkage~length, lena,
+   method = "rf",
+  trControl = trainControl(
+    method = "cv", number = 5,
+    repeats = 5, verboseIter = TRUE
+  )
+)
+
+rfmodel
+
+lena$rfpred <- predict(rfmodel)
+lena$rfresid <- lena$wkage -lena$rfpred
+
+```
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+mlena <- gather(lena,key="model", value="pred", c("sqpred", "linpred", "logpred", "rfpred"))
+
+
+
+ggplot(mlena, aes(x=wkage, y=pred, colour=model))+
+  geom_point()+
+  facet_wrap(~model, ncol=2)+
+  theme_bw()+
+  scale_colour_brewer(palette="Set1")+
+  ggtitle("Model predicted vs real values", subtitle="3 types of regression + random forest")+
+  xlab("Body length (mm)")+
+  ylab("Age (weeks)")
+
+
+
+
+
+#mlena <- gather(lena,key="model", value="pred", c("sqpred", "linpred", "logpred", "wkage"))
+ggplot(mlena, aes(y=length, x=pred, colour=model))+
+  geom_point()+
+  geom_point(aes(x=wkage), colour="black")+
+  facet_wrap(~model, ncol=2)+
+  theme_bw()+
+  scale_colour_brewer(palette="Set1")+
+  ggtitle("Predictions of models: length vs age", subtitle="3 types of regression + random forest")+
+  xlab("Body length (mm)")+
+  ylab("Age (weeks)")
+  
+
+
+mlena <- gather(lena,key="model", value="resid", c("sqresid", "linresid", "logresid", "rfresid"))
+ggplot(mlena, aes(x=wkage, y=resid, colour=model))+
+  geom_bar(stat='identity')+
+  facet_wrap(~model, ncol=1)+
+  theme_bw()+
+  scale_colour_brewer(palette="Set1")+
+  ggtitle("Model residuals", subtitle="3 types of regression + random forest")+
+  ylab("Residual")+
+  xlab("Age (weeks)")
+
+```
+
+The best model is the linear regression of the squared length. With this, we get a very nice predictive power: `sqmodel$results`  Let's use this to predict the age of all samples where we only have length and not age. 
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+sampleinfo$lensq <-sampleinfo$length^2
+sampleinfo$predage <- NA
+
+sampleinfo$predage[!is.na(sampleinfo$lensq)] <- predict(sqmodel, newdata=sampleinfo)
+
+```
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+save(sampleinfo,ctall.norm,ctallgood.norm, codeset,geneinf,ctall.unnorm, ctall.intonly , file="allns_data.rdata")
+
+
+```
+
