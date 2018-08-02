@@ -15,6 +15,7 @@ library(caret)
 library(RColorBrewer)
 library(ggrepel)
 library(gtools)
+library(FinCal)
 ````
 
 
@@ -57,7 +58,7 @@ ggplot(md, aes(x=predage, y=rfagepred))+
   theme_bw()+
  scale_colour_manual(values=c("darkviolet", "cornflower blue", "forest green", "red3"))+
   geom_text_repel(aes(label=sample,colour=type), size=2.5)
-  ggtitle("How does regeneration affect
+  ggtitle("How does regeneration affect")
 
 
 ````
@@ -82,45 +83,154 @@ young <- t(subset(t(md), sampleinfo$type =="Y" &
 
 #regen <- md[, sampleinfo$type == "OR"]
 
-regen <- t(subset(t(md), sampleinfo$type =="OR" ))
+regen <- t(subset(t(md), sampleinfo$type =="OR" &
+                    sampleinfo$over0reads >100 &
+                    sampleinfo$prep == "Luke"))
 
 
-OR <- foldchange2logratio(foldchange(rowMeans(old), rowMeans(regen)))
-
-OY <- foldchange2logratio(foldchange(rowMeans(old), rowMeans(young)))
-
-
-
-
-
-
-oreg <- cbind(old, regen)
-
-t.result <- apply(oreg, 1, function (x)t.test(x[1:ncol(old)],x[ncol(old)+1:ncol(oreg)]))
-
-
-
-md$ovreg.pval <- unlist(lapply(t.result, function(x) x$p.value))
+vardat <- data.frame(
+  name= rownames(md), 
+  sname= substr(rownames(md), 1,2),
+  ROvOl2fc= foldchange2logratio(foldchange(rowMeans(regen), rowMeans(old))),
+  sROvOl2fc= round(foldchange2logratio(foldchange(rowMeans(regen), rowMeans(old))), 2),
+  YvOl2fc = foldchange2logratio(foldchange(rowMeans(young), rowMeans(old))), 
+  regencv = coefficient.variation(rowMeans(regen), apply(regen,1, sd))
+) %>%
+  mutate(ord = 1:length(sname))
 
 
 
-vardat$ovregsig <- vardat$ovreg.pval <0.1
-
-ggplot(data=vardat, aes(x=YvOl2fc, y=ROvOl2fc, label=sname))+
-  geom_point()+
+ggplot(data=vardat, aes(x=YvOl2fc, y=ROvOl2fc, label=sname, fill=regencv))+
+  geom_point(size=3, shape=21)+
+#  geom_label()+
   geom_hline(yintercept=0, colour="black")+
   geom_vline(xintercept=0, colour="black")+
-  theme_bw()+
+  theme_minimal()+
   xlim(-6,+6)+
   ylim(-6,6)+
   xlab("Young vs Old Log2 Fold Change") +
-  ylab("Regenerated vs Old Log2 Fold Change")
-
+  ylab("Regenerated vs Old Log2 Fold Change")+
+#  scale_shape_manual(values=c(21,23), labels=c(">0.1", "<0.1"), breaks=c(FALSE, TRUE) ,name="RO vs O p-value" )+
+  scale_fill_gradient2(high="red3", mid="white", low="blue", midpoint=1, name="cv (regen)")+
+  geom_abline(inherit.aes=FALSE, intercept=0, slope=1, linetype=2)
 
 ```
 
 
 
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
+md <- t(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
+  #              sampleinfo$qual == "ok"& 
+                 sampleinfo$exp %in% c("OvY", "Size-age", "cohorts", "regen") & 
+                 sampleinfo$ctg>2 & 
+                 sampleinfo$type %in% c("O",  "Y", "OR")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+si <- subset(sampleinfo, sampleinfo$sample %in% colnames(md))
+
+
+
+nmd <- as.data.frame(md/rowMeans(md))
+
+vardat <- vardat %>% 
+  cbind( data.frame(oldmean = rowMeans(nmd[, si$type == "O"]), 
+                    youngmean = rowMeans(nmd[, si$type == "Y"]), 
+                    regmean = rowMeans(nmd[, si$type == "OR"]) )) %>%
+  left_join(select(minf,name, dir) , by="name")
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+#nmd$name <- rownames(md)
+nmd$sname <- substr(rownames(md), 1,2)
+
+
+
+nmd$di <- paste0(ifelse(nmd$dir == "upregulated with age", "up", "down"), ": ", nmd$sname)
+
+
+
+sl <- as.character(sampleinfo$sample[sampleinfo$sample %in% colnames(nmd)])
+
+mmd <- gather(as.data.frame(md), key="sample", value="expression", sl)
+
+nmd <- as.data.frame(nmd) %>%  left_join(vardat, by="sname") 
+
+
+nmd$sname <- factor(nmd$sname, levels=nmd$sname[order(nmd$ROvOl2fc)])
+
+
+
+mnmd <- nmd %>%  gather(key="sample", value="normexp", sl) %>%
+  left_join(sampleinfo, by= "sample") %>%
+  left_join(mmd, by="sample")
+
+
+
+ggplot(mnmd, aes(x= sname, y=normexp, colour=type))+
+  geom_point(alpha=0.1)+
+  stat_summary()+
+  theme_bw()+
+#  geom_boxplot(outlier.shape=NA)+
+  scale_y_continuous(trans="log2")+
+  facet_grid(~dir, space="free",scales="free" )+
+#  geom_boxplot(outlier.shape = NA)+
+  scale_colour_manual(values=c("cornflower blue", "forest green", "red3"))+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  ylab("Normalised Expression") +
+  xlab('Marker')+
+  geom_text(data=vardat,inherit.aes=F, aes(x=sname, y=20, label=sROvOl2fc), angle=60)
+  
+ggplot(mnmd, aes(x= sname, y=normexp, fill=type))+
+#  geom_point(alpha=0.1)+
+#  stat_summary()+
+  theme_bw()+
+  geom_boxplot(outlier.shape=NA)+
+  scale_y_continuous(trans="log2")+
+  facet_grid(~dir, space="free",scales="free" )+
+#  geom_boxplot(outlier.shape = NA)+
+  scale_fill_manual(values=c("cornflower blue", "forest green", "red3"))+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  ylab("Normalised Expression") +
+  xlab('Marker')+
+  geom_text(data=vardat,inherit.aes=F, aes(x=sname, y=20, label=sROvOl2fc), angle=60)
+
+````
+ 
+ There seems to be little in the way of consistency in the response to regeneration!
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+ggplot(mnmd, aes( x=normexp, fill=type))+
+#  geom_point(alpha=0.1)+
+#  stat_summary()+
+  theme_bw()+
+#  geom_boxplot(outlier.shape=NA)+
+  scale_x_continuous(trans="log2")+
+  facet_grid(~dir, space="free",scales="free" )+
+#  geom_boxplot(outlier.shape = NA)+
+  scale_fill_manual(values=c("cornflower blue", "forest green", "red3"))+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  xlab("Normalised Expression") +geom_density(alpha=0.5)
+
+
+
+ggplot(subset(mnmd, mnmd$regencv >1), aes( x=normexp, fill=type))+
+#  geom_point(alpha=0.1)+
+#  stat_summary()+
+  theme_bw()+
+#  geom_boxplot(outlier.shape=NA)+
+  scale_x_continuous(trans="log2")+
+  facet_wrap(~sname+dir, scales="free" )+
+#  geom_boxplot(outlier.shape = NA)+
+  scale_fill_manual(values=c("cornflower blue", "forest green", "red3"))+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  xlab("Normalised Expression") +geom_density(alpha=0.5)+
+  theme(axis.text.x=element_blank(),axis.ticks=element_blank())
+
+````
+What if we take only the markers with the least variation and use those to look at how regen affects aging, as measured with the RF model? 
 
 
