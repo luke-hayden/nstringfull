@@ -1,7 +1,7 @@
 ---
-title: "age-length"
+title: "Modelling the relationship between age and body length"
 author: "Luke Hayden"
-date: "August 1, 2018"
+date: "August 3, 2018"
 output: html_document
 ---
 
@@ -34,13 +34,14 @@ lena <- sampleinfo %>%
 
 ```
 
-#Age-length relationship
+#Age-length relationship visualised
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
 
 ggplot(lena, aes(y=length, x=wkage))+
-  geom_point(aes(colour=prep))+
+  geom_point()+
   geom_smooth()+
   theme_bw()+
   scale_colour_brewer(palette="Set1")+
@@ -49,17 +50,16 @@ ggplot(lena, aes(y=length, x=wkage))+
   xlab("Age (weeks)")
   
 ```
+
 #Model length vs age
 
 We will use the following models:
 
-linear regression: age ~ length
+###Linear regression: age ~ length
 
-linear regression: age ~ log(length)
-
-linear regression: age ~ length^2
-
-random forest (probably a sledgehammer to crack a nut)
+Relevant metrics: 
+RMSE (lower is better)
+R^2 (higher is better)
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
@@ -84,8 +84,10 @@ linmodel
 lena$linpred <- predict(linmodel)
 
 lena$linresid <- lena$wkage -lena$linpred
+```
 
-
+###Log linear regression: age ~ log(length)
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 logmodel <- train(
   wkage~loglen, lena,
    method = "lm",
@@ -101,6 +103,11 @@ lena$logpred <- predict(logmodel)
 
 lena$logresid <-lena$wkage -lena$logpred
 
+```
+
+###Squared Linear regression: age ~ length^2
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 sqmodel <- train(
   wkage~lensq, lena,
    method = "lm",
@@ -116,6 +123,11 @@ lena$sqpred <- predict(sqmodel)
 lena$sqresid <- lena$wkage -lena$sqpred
 
 
+```
+
+###Random forest (probably a sledgehammer to crack a nut)
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 rfmodel <- train(
   wkage~length, lena,
    method = "rf",
@@ -132,6 +144,8 @@ lena$rfresid <- lena$wkage -lena$rfpred
 
 ```
 
+#Compare our models
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 mlena <- gather(lena,key="model", value="pred", c("sqpred", "linpred", "logpred", "rfpred"))
@@ -144,8 +158,8 @@ ggplot(mlena, aes(x=wkage, y=pred, colour=model))+
   theme_bw()+
   scale_colour_brewer(palette="Set1")+
   ggtitle("Model predicted vs real values", subtitle="3 types of regression + random forest")+
-  xlab("Body length (mm)")+
-  ylab("Age (weeks)")
+  xlab("Age (weeks): predicted")+
+  ylab("Age (weeks): real data")+geom_smooth(method="lm")
 
 
 
@@ -158,7 +172,7 @@ ggplot(mlena, aes(y=length, x=pred, colour=model))+
   facet_wrap(~model, ncol=2)+
   theme_bw()+
   scale_colour_brewer(palette="Set1")+
-  ggtitle("Predictions of models: length vs age", subtitle="3 types of regression + random forest")+
+  ggtitle("Predictions of models: length vs age", subtitle="3 types of regression + random forest \n black points: real values")+
   xlab("Body length (mm)")+
   ylab("Age (weeks)")
   
@@ -176,7 +190,7 @@ ggplot(mlena, aes(x=wkage, y=resid, colour=model))+
 
 ```
 
-The best model is the linear regression of the squared length. With this, we get a very nice predictive power: `sqmodel$results`  Let's use this to predict the age of all samples where we only have length and not age. 
+The best model is the linear regression of the squared length. With this, we get a very nice predictive power: `sqmodel$results`  Let's use this to predict the age of all samples where we only have length and not age. The accuracy of this model is very high, which is great!
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}

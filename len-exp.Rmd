@@ -1,0 +1,287 @@
+---
+title: "exp-len"
+author: "Luke Hayden"
+date: "August 3, 2018"
+output: html_document
+---
+
+#Set-up and data import
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+library(dplyr)
+library(ggbiplot)
+library(tibble)
+library(tidyr)
+library(caret)
+library(RColorBrewer)
+library(ggrepel)
+library(gtools)
+````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+setwd("~/Documents/nstringjul18")
+load(file="allns_data.rdata")
+
+````
+
+
+##Expression/length relationship
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+
+
+ggplot(mnmd, aes(x=length, y=normexp))+
+  geom_point(aes(fill=type), shape=21, colour="white")+
+  geom_smooth(method="lm", aes(colour=dir), alpha=0.3, se=F, size=1)+
+  theme_bw()+
+ scale_y_continuous(trans="log2")+
+  scale_colour_manual(values=c("orangered","forest green"))+
+  scale_fill_manual(values=c("darkviolet", "cornflower blue",  "red3"))+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  ylab("Normalised Expression") +
+  xlab('Body length')+
+  facet_wrap(~sname, scales="free_y")
+
+
+
+
+
+ggplot(mnmd, aes(x=length, y=normexp))+
+  geom_point(aes(colour=type))+
+#  geom_text(aes(label=sample, colour=type))+
+  geom_smooth(method="lm", se=F, aes(size=sname),alpha=0.3,linetype=1, colour="gray30")+
+  scale_size_manual(values=rep(0.5,50), guide=F)+
+  theme_bw()+
+scale_y_continuous(trans="log2")+
+ scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  ylab("Normalised Expression") +
+  xlab('Body length')+
+  facet_wrap(~dir)
+
+
+```
+
+#Model length vs expression
+All markers as predictors
+Linear regression
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+  #              sampleinfo$qual == "ok"& 
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+                 sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+md$sample <- rownames(md)
+
+md <- left_join(md, select(sampleinfo, sample, length), by="sample") %>%
+  filter(!(is.na(length))) %>%
+  column_to_rownames(var="sample")
+
+
+model <- train(
+  length~., md,
+   method = "lm",
+  trControl = trainControl(
+    method = "cv", number = 5,
+    repeats = 5, verboseIter = TRUE
+  )
+)
+
+model
+
+
+```
+
+
+#Model length vs expression
+50 chosen markers:
+Linear regression
+Random forest
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
+  #              sampleinfo$qual == "ok"& 
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+md$sample <- rownames(md)
+
+md <- left_join(md, select(sampleinfo, sample, length), by="sample") %>%
+  filter(!(is.na(length))) %>%
+  column_to_rownames(var="sample")
+
+
+linmodel <- train(
+  length~., md,
+   method = "lm",
+  trControl = trainControl(
+    method = "cv", number = 5,
+    repeats = 5, verboseIter = TRUE
+  )
+)
+
+
+linmodel <- lm(
+  length~., md
+)
+
+print("linear regression:")
+summary(linmodel)
+#plot(lmodel)
+
+
+(rflinmodel <- train(
+  length~.,
+  tuneLength = 1,
+  data = md, method = "ranger",
+  trControl = trainControl(method = "cv", number = 5, verboseIter = TRUE)
+))
+
+
+print("random forest:")
+model
+plot(rflinmodel)
+
+
+```
+
+Log transformation of the lengths:
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
+  #              sampleinfo$qual == "ok"& 
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+md$sample <- rownames(md)
+
+md <- left_join(md, select(sampleinfo, sample, length), by="sample") %>%
+  filter(!(is.na(length))) %>%
+  column_to_rownames(var="sample")
+
+md$length <- log(md$length)
+
+linlogmodel <- train(
+  length~., md,
+   method = "lm",
+  trControl = trainControl(
+    method = "cv", number = 5,
+    repeats = 5, verboseIter = TRUE
+  )
+)
+
+print("linear regression:")
+linlogmodel
+
+
+rflogmodel <- train(
+  length~.,
+  tuneLength = 4,
+  data = md, method = "ranger",
+  trControl = trainControl(method = "cv", number = 5, verboseIter = TRUE)
+)
+
+print("random forest:")
+rfmodel
+plot(rflogmodel)
+
+md$length <-exp(md$length)
+```
+
+Square of the lengths:
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+md$length <- md$length^2
+
+
+linsqmodel <- train(
+  length~., md,
+   method = "lm",
+  trControl = trainControl(
+    method = "cv", number = 5,
+    repeats = 5, verboseIter = TRUE
+  )
+)
+
+print("linear regression:")
+linsqmodel
+
+
+rfsqmodel <- train(
+  length~.,
+  tuneLength = 4,
+  data = md, method = "ranger",
+  trControl = trainControl(method = "cv", number = 5, verboseIter = TRUE)
+)
+
+print("random forest:")
+rfmodel
+plot(rfsqmodel)
+
+md$linpred <- predict(linmodel)
+md$rflinpred <- predict(rflinmodel)
+md$linlogpred <- exp(predict(linlogmodel))
+md$rflogpred <-  exp(predict(rflogmodel))
+md$linsqpred <- exp(predict(linsqmodel))
+md$rfsqpred <-  exp(predict(rfsqmodel))
+
+
+md$length <- sqrt(md$length)
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(select(sampleinfo,wkage, sample) , by=("sample"="sample") )
+
+
+```
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+preddf <- data.frame(length=md$length , 
+                     sample = rownames(md), 
+                     wkage =md$wkage,
+
+                     rflinpred = predict(rflinmodel),
+                     linlogpred = exp(predict(linlogmodel)),
+                     rflogpred =  exp(predict(rflogmodel)), 
+                     
+                     linsqpred = sqrt(predict(linsqmodel)),
+                     rfsqpred =  sqrt(predict(rfsqmodel))
+                     
+)
+
+
+mpreddf <- gather(preddf, key="model", value="prediction", -length, -sample, -wkage)
+
+
+
+
+ggplot(mpreddf, aes(x=length, y=prediction, colour=model))+
+  geom_point()+
+  geom_point(aes(y=length), colour="black")+
+  facet_wrap(~model, ncol=2)+
+  theme_bw()
+
+
+
+```

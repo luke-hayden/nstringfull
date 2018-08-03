@@ -1,7 +1,7 @@
 ---
 title: "Aging effect"
 author: "Luke Hayden"
-date: "July 26, 2018"
+date: "August 3, 2018"
 output: html_document
 ---
 #Set-up and data import
@@ -30,8 +30,11 @@ load(file="allns_data.rdata")
 
 
 #Old vs Young separation
+
 Old vs young as main groups
+
 ##PCA old vs young
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
@@ -65,6 +68,7 @@ ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, v
 ````
 
 ##What markers best separate old vs young?
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 md <- t(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
@@ -111,17 +115,6 @@ nmd$di <- paste0(ifelse(nmd$dir == "upregulated with age", "up", "down"), ": ", 
 
 #nmd <- as.data.frame(md/rowMeans(md))
 
-ggplot(nmd, aes(y=p_value, x=YvOl2fc, fill=good))  +
-  scale_shape_manual(values=c(21,22))+
-  geom_point(shape=21, colour="black")+ 
-  theme_bw()+
-  scale_fill_manual(values=c("darkgrey", "orange"), name="",breaks=c(T,F), labels=c("chosen markers", "other")) +
-  scale_colour_manual(values=c("red3", "black"))+
-  xlab("Absolute Young vs Old Log2Foldchange") +
-  ylab("Old vs young p-value")+
-  ggtitle(paste(sum(nmd$good), " markers: new optimised set"))+
-    geom_hline(linetype=2, yintercept = 0.05)
-
 
 
 ````
@@ -139,13 +132,14 @@ mnmd <- gather(nmd, key="sample", value="normexp", sl) %>%
   left_join(mmd, by="sample")
 
 
-ggplot(mnmd, aes(x= sname, y=normexp, fill=type))+
+ggplot(mnmd, aes(x= sname, y=normexp, colour=type))+
 #  geom_point()+
   theme_bw()+
   geom_boxplot(outlier.shape=NA)+
   scale_y_continuous(trans="log2")+
   facet_grid(~dir, space="free",scales="free" )+
 #  geom_boxplot(outlier.shape = NA)+
+  scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
   scale_fill_manual(values=c("darkviolet", "cornflower blue", "red3"))+
   theme(axis.text.x = element_text(angle = 60, hjust = 1))+
   ylab("Normalised Expression") +
@@ -155,263 +149,17 @@ ggplot(mnmd, aes(x= sname, y=normexp, fill=type))+
 
 ````
 
-##Expression/length relationship
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-
-
-
-ggplot(mnmd, aes(x=length, y=normexp))+
-  geom_point(aes(fill=type), shape=21, colour="white")+
-  geom_smooth(method="lm", aes(colour=dir), alpha=0.3, se=F, size=1)+
-  theme_bw()+
- scale_y_continuous(trans="log2")+
-  scale_colour_manual(values=c("orangered","forest green"))+
-  scale_fill_manual(values=c("darkviolet", "cornflower blue",  "red3"))+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
-  ylab("Normalised Expression") +
-  xlab('Body length')+
-  facet_wrap(~sname, scales="free_y")
-
-
-
-
-
-ggplot(mnmd, aes(x=length, y=normexp))+
-  geom_point(aes(colour=type))+
-#  geom_text(aes(label=sample, colour=type))+
-  geom_smooth(method="lm", se=F, aes(size=sname),alpha=0.3,linetype=1, colour="gray30")+
-  scale_size_manual(values=rep(0.5,50), guide=F)+
-  theme_bw()+
-scale_y_continuous(trans="log2")+
- scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
-  ylab("Normalised Expression") +
-  xlab('Body length')+
-  facet_wrap(~dir)
-
-
-```
-
-#Model length vs expression
-All markers as predictors
-Linear regression
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
-  #              sampleinfo$qual == "ok"& 
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
-                 sampleinfo$ctg>2 & 
-                sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$type %in% c("O", "Y", "M")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
-md$sample <- rownames(md)
-
-md <- left_join(md, select(sampleinfo, sample, length), by="sample") %>%
-  filter(!(is.na(length))) %>%
-  column_to_rownames(var="sample")
-
-
-model <- train(
-  length~., md,
-   method = "lm",
-  trControl = trainControl(
-    method = "cv", number = 5,
-    repeats = 5, verboseIter = TRUE
-  )
-)
-
-model
-
-
-```
-
-
-#Model length vs expression
-50 chosen markers:
-Linear regression
-Random forest
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-md <- as.data.frame(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
-  #              sampleinfo$qual == "ok"& 
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
- #                sampleinfo$ctg>2 & 
-                sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$type %in% c("O", "Y", "M")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
-md$sample <- rownames(md)
-
-md <- left_join(md, select(sampleinfo, sample, length), by="sample") %>%
-  filter(!(is.na(length))) %>%
-  column_to_rownames(var="sample")
-
-
-linmodel <- train(
-  length~., md,
-   method = "lm",
-  trControl = trainControl(
-    method = "cv", number = 5,
-    repeats = 5, verboseIter = TRUE
-  )
-)
-
-
-linmodel <- lm(
-  length~., md
-)
-
-print("linear regression:")
-summary(linmodel)
-#plot(lmodel)
-
-
-(rflinmodel <- train(
-  length~.,
-  tuneLength = 1,
-  data = md, method = "ranger",
-  trControl = trainControl(method = "cv", number = 5, verboseIter = TRUE)
-))
-
-
-print("random forest:")
-model
-plot(rflinmodel)
-
-
-```
-
-Log transformation of the lengths:
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-md <- as.data.frame(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
-  #              sampleinfo$qual == "ok"& 
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
- #                sampleinfo$ctg>2 & 
-                sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$type %in% c("O", "Y", "M")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
-md$sample <- rownames(md)
-
-md <- left_join(md, select(sampleinfo, sample, length), by="sample") %>%
-  filter(!(is.na(length))) %>%
-  column_to_rownames(var="sample")
-
-md$length <- log(md$length)
-
-linlogmodel <- train(
-  length~., md,
-   method = "lm",
-  trControl = trainControl(
-    method = "cv", number = 5,
-    repeats = 5, verboseIter = TRUE
-  )
-)
-
-print("linear regression:")
-linlogmodel
-
-
-rflogmodel <- train(
-  length~.,
-  tuneLength = 4,
-  data = md, method = "ranger",
-  trControl = trainControl(method = "cv", number = 5, verboseIter = TRUE)
-)
-
-print("random forest:")
-rfmodel
-plot(rflogmodel)
-
-md$length <-exp(md$length)
-```
-
-Square of the lengths:
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-md$length <- md$length^2
-
-
-linsqmodel <- train(
-  length~., md,
-   method = "lm",
-  trControl = trainControl(
-    method = "cv", number = 5,
-    repeats = 5, verboseIter = TRUE
-  )
-)
-
-print("linear regression:")
-linsqmodel
-
-
-rfsqmodel <- train(
-  length~.,
-  tuneLength = 4,
-  data = md, method = "ranger",
-  trControl = trainControl(method = "cv", number = 5, verboseIter = TRUE)
-)
-
-print("random forest:")
-rfmodel
-plot(rfsqmodel)
-
-md$linpred <- predict(linmodel)
-md$rflinpred <- predict(rflinmodel)
-md$linlogpred <- exp(predict(linlogmodel))
-md$rflogpred <-  exp(predict(rflogmodel))
-md$linsqpred <- exp(predict(linsqmodel))
-md$rfsqpred <-  exp(predict(rfsqmodel))
-
-
-md$length <- sqrt(md$length)
-
-md <- md %>%
-  rownames_to_column(var="sample") %>%
-  left_join(select(sampleinfo,wkage, sample) , by=("sample"="sample") )
-
-
-```
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-
-preddf <- data.frame(length=md$length , 
-                     sample = rownames(md), 
-                     wkage =md$wkage,
-
-                     rflinpred = predict(rflinmodel),
-                     linlogpred = exp(predict(linlogmodel)),
-                     rflogpred =  exp(predict(rflogmodel)), 
-                     
-                     linsqpred = sqrt(predict(linsqmodel)),
-                     rfsqpred =  sqrt(predict(rfsqmodel))
-                     
-)
-
-
-mpreddf <- gather(preddf, key="model", value="prediction", -length, -sample, -wkage)
-
-
-
-
-ggplot(mpreddf, aes(x=length, y=prediction, colour=model))+
-  geom_point()+
-  geom_point(aes(y=length), colour="black")+
-  facet_wrap(~model, ncol=2)+
-  theme_bw()
-
-
-
-```
 
 
 #Models of age based on marker gene expression
+
+##Building the model:
+
+###Multiple linear regression: 
+
+Complete failure of model due to overfitting. Need a better method!
+
+###Random forest
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
@@ -435,21 +183,28 @@ rfagemodel <- train(
   predage~.,
   tuneLength = 4,
   data = md, method = "ranger",
-  trControl = trainControl(method = "cv", number = 5, verboseIter = TRUE)
+  trControl = trainControl(method = "cv", number = 5, verboseIter = F)
 )
 
-print("random forest:")
-rfmodel
-plot(rfagemodel)
+rfagemodel
+#print("random forest:")
+#summary(rfagemodel)
+#plot(rfagemodel)
+
+```
+
+##Model accuracy: age from body length regression
 
 
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 md$rfagepred <- predict(rfagemodel)
+
 md <- md %>%
   rownames_to_column(var="sample") %>%
   left_join(select(sampleinfo, -predage), by="sample")
 
 
-acc <- lm(predage~rfagepred, md)
+accrf <- lm(predage~rfagepred, md)
 
 
 ggplot(md, aes(x=predage, y=rfagepred))+
@@ -460,9 +215,15 @@ ggplot(md, aes(x=predage, y=rfagepred))+
   theme_bw()+
  scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
   geom_text_repel(aes(label=sample,colour=type), size=2.5)+
-  ggtitle("Using Marker gene expression to predict age", subtitle=paste("R^2 of correlation between measure from length and from gene expression:", round(summary(acc)$r.squared, 3)))
+  ggtitle("Using Marker gene expression to predict age", subtitle=paste("R^2 of correlation between measure from length and from gene expression:", round(summary(accrf)$r.squared, 3)))
 
 
+```
+
+
+##Model accuracy: cohort age data
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
   
 ggplot(md, aes(x=wkage, y=rfagepred))+
@@ -473,7 +234,7 @@ ggplot(md, aes(x=wkage, y=rfagepred))+
   theme_bw()+
  scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
   geom_text_repel(aes(label=sample,colour=type), size=2.5)+
-  ggtitle("Using Marker gene expression to predict age", subtitle=paste("R^2 of correlation between measure from length and from gene expression:", round(summary(lm(as.numeric(wkage)~rfagepred, md))$r.squared, 3)))
+  ggtitle("Using Marker gene expression to predict age", subtitle=paste("R^2 of correlation between actual age and predicted age based on gene expression with random forest model:", round(summary(lm(as.numeric(wkage)~rfagepred, md))$r.squared, 3)))
 
 
 
