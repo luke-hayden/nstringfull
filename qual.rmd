@@ -12,17 +12,42 @@ library(dplyr)
 library(ggbiplot)
 library(tibble)
 library(tidyr)
+library(reshape2)
 ````
 
 
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
+setwd("~/Documents/nstringjul18")
+load(file="allns_data.rdata")
 
 ````
 
 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+mc <- melt(ctall.norm/rowMeans(ctall.norm, na.rm=T))
+colnames(mc) <- c("marker", "sample", "expression")
+mc <- left_join(mc, sampleinfo, by= "sample") %>%
+#  left_join(posdf, by= "sample") %>%
+  mutate(ctgsamp= paste0(ctg,"  ",  sample, ": ", over10reads  ))
+
+
+
+(p=ggplot(mc, aes(x=marker, y=expression, colour=over0reads)) +geom_point() +
+  facet_wrap(~ctgsamp, ncol=6)+
+    scale_y_log10()+
+    scale_colour_gradient(high="green", low="red2")+
+    theme_minimal()
+  )
+  
+ggsave(plot=p, filename = "qual.pdf", device="pdf", height=40, width=6, limitsize = F)
+  
+
+````
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
