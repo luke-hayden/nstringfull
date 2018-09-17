@@ -70,6 +70,8 @@ ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, v
 
 ##What markers best separate old vs young?
 
+Build linear regression for the expression of each marker vs age (based on size)
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
@@ -114,8 +116,16 @@ lmdf <- data.frame(name =markerlist, rsq=unlist(arsqlist), rmse=unlist(rmselist)
   left_join(geneinf, by="name")
 
 
-ggplot(lmdf, aes(x=name, y=rsq, fill=in61, label=name))+
-  geom_bar(stat="identity")
+lmdf$sname <- substr(lmdf$name, 1,2)
+lmdf$sname <- factor(lmdf$sname, levels=lmdf$sname[order(lmdf$rsq)])
+
+
+ggplot(lmdf, aes(x=sname, y=rsq, fill=in61))+
+  theme_bw()+
+  geom_bar(stat="identity")+
+  ylab("R-squared \n (linear regression age vs expression)")+
+  xlab("Marker")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size=4))
 
 
 
@@ -157,12 +167,14 @@ lmdf2 <- left_join(lmdf, pvals, by="name")
 pthresh <- 0.05
 
 ggplot(lmdf2, aes(x=pvalovy, y=rsq, fill=in61, label=name))+
+  theme_bw()+
   geom_point(shape=21)+
   scale_x_log10()+
   geom_vline(x=pthresh, xintercept = pthresh, linetype=2)+
   ggtitle(paste(length(lmdf$name[
-    #lmdf2$rsq>0.05 & 
-      lmdf2$pvalovy <pthresh])))#+geom_text()
+      lmdf2$pvalovy <pthresh]), "markers with significant old vs young p-value"))+ 
+  xlab("Old vs young p-value")+
+  ylab("R-squared \n (linear regression age vs expression)")
 
 
 
@@ -228,6 +240,7 @@ nmd$di <- paste0(ifelse(nmd$dir == "upregulated with age", "up", "down"), ": ", 
 
 ##Expression/length relationship
 
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 mnmd <- gather(nmd, key="sample", value="normexp", ns)
 
@@ -240,10 +253,10 @@ mnmd<- subset(mnmd, (!is.na(predage))) %>%
 
 mnmd$grsq <- mnmd$rsq > 0.06
 
-
+mnmd$ca <- ifelse(mnmd$chosenand == T, "amongst chosen 50", "not amongst chosen 50")
 
 ggplot(mnmd, aes(x=predage, y=normexp))+
- # geom_point(shape=21, aes(fill=type))+
+#  geom_point(shape=21, aes(fill=type))+
 #  geom_text(aes(label=sample, colour=type))+
    geom_smooth(method="lm", se=F, aes(size=sname, colour=grsq),alpha=0.3,linetype=1)+
   scale_size_manual(values=rep(0.5,195), guide=F)+
@@ -253,48 +266,11 @@ ggplot(mnmd, aes(x=predage, y=normexp))+
   theme(axis.text.x = element_text(angle = 60, hjust = 1))+
   ylab("Normalised Expression") +
 #  xlab('pre')+
-  facet_grid(dir~chosenand)+
-  scale_colour_manual(values=c("orange", "green"))
+  facet_grid(dir~ca)+
+  scale_colour_manual(values=c("grey", "forest green"))
 ```
 
 
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-ggplot(mnmd, aes(x=predage, y=normexp))+
-  geom_point(aes(fill=type), shape=21, colour="white")+
-  geom_smooth(method="lm", aes(colour=in61), alpha=0.3, se=F, size=1)+
-  theme_bw()+
- scale_y_continuous(trans="log2")+
-  scale_colour_manual(values=c("orangered","forest green"))+
-  scale_fill_manual(values=c("darkviolet", "cornflower blue",  "red3"))+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
-  ylab("Normalised Expression") +
-  xlab('Body length')+
-  facet_wrap(~dir)
-
-  facet_wrap(~sname, scales="free_y")
-
-
-
-
-ggplot(mnmd, aes(x=predage, y=normexp, fill=type))+
-  geom_point(shape=21)+
-#  geom_text(aes(label=sample, colour=type))+
-  geom_smooth(method="lm", se=F, aes(size=sname, colour=chosenand),alpha=0.3,linetype=1)+
-  scale_size_manual(values=rep(0.5,50), guide=F)+
-  theme_bw()+
-scale_y_continuous(trans="log2")+
- scale_fill_manual(values=c("darkviolet", "cornflower blue", "red3"))+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
-  ylab("Normalised Expression") +
-#  xlab('pre')+
-  facet_wrap(~dir)
-
-
-
-
-
-```
 
 
 ##Old vs young by marker
@@ -388,7 +364,7 @@ ggplot(mnmd, aes(x=sname , y=normexp, colour=in61))+
   geom_point()+
 #  geom_boxplot()+
   scale_y_continuous(trans="log2")
-  geom_text(cvdf, aes(x=sname, y=10, label=regencv), angle=60)
+ # geom_text(cvdf, aes(x=sname, y=10, label=regencv), angle=60)
  
 
 
@@ -414,7 +390,7 @@ md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
                  sampleinfo$prep== "Luke"&
                  sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
  #                sampleinfo$ctg>2 & 
-                sampleinfo$codeset == "phaw_1" &
+#                sampleinfo$codeset == "phaw_1" &
                  sampleinfo$type %in% c("O", "Y", "M")& 
   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
 
@@ -427,8 +403,8 @@ chosenformodel <- as.character(cvdf$name[cvdf$regencv >1])
 
 #chosenformodel <- as.character(lmdf2$name[lmdf2$in61==T])
 
-md <- md[,colnames(md) %in% chosenformodel]
-
+#md <- md[,colnames(md) %in% chosenformodel]
+md <- md[,minf$chosenand ==T]
 
 md$sample <- rownames(md)
 

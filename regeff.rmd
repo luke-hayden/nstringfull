@@ -41,12 +41,12 @@ Model built previously: random forest using all 50 markers
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 md <- as.data.frame(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY", "regen") & 
-                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") & 
+ #               sampleinfo$codeset == "phaw_1" &
                   sampleinfo$qual != "bad"&
-                  sampleinfo$over10reads >70 &
-                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD","Areg", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+                  sampleinfo$over10reads >20 &
+                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR", "OR-A")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD","Areg", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8", "Sreg"))))
 
 
 md$rfagepred <- predict(rfagemodel, newdata= md)
@@ -62,8 +62,14 @@ md <- left_join(md, sampleinfo, by="sample") %>%
 md$type <- as.character(md$type)
 md$type <- as.factor(case_when(
   md$type %in% c("O", "M", "Y") ~ as.character(md$type), 
-  md$type %in% c("MR", "YR", "OR") ~"R"
+  md$type %in% c("MR", "YR", "OR", "OR-A") ~"R"
 ))
+
+
+md$regentime[is.na(md$regentime)] <- ""
+
+
+md$typer <- paste0(md$type, md$regentime)
 
 
 lm <- lm(rfagepred~predage, data=md)
@@ -71,13 +77,13 @@ md$lmresid <- lm$residuals
 md$lmressign <- md$lmresid >0
 
 ggplot(md, aes(x=predage, y=rfagepred))+
-  geom_point(aes(colour=type))+
+  geom_point(aes(colour=typer))+
   xlab("Age (weeks) from body length") +
   ylab("Age (weeks) from marker gene expression (random forest model)")+
   geom_smooth(method="lm", colour="black")+
   theme_bw()+
- scale_colour_manual(values=c("darkviolet", "cornflower blue", "forest green", "red2"), name="")+
-  geom_text_repel(aes(label=sample,colour=type), size=2.5)+
+ scale_colour_manual(values=c("darkviolet", "cornflower blue", "aquamarine3","forest green", "limegreen",  "red2"), name="")+
+  geom_text_repel(aes(label=sample,colour=typer), size=2.5)+
   ggtitle("How does regeneration affect molecular age?")
 ```
 
@@ -104,6 +110,17 @@ t.test(md$lmresid[md$reg =="R"] , alternative="less" )
   
 
 ````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+ggplot(md, aes(x=regentime, y=lmresid, fill=regentime))+geom_boxplot()
+
+
+```
 
 It's significant!
 
