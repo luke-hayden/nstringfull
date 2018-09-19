@@ -40,13 +40,16 @@ Model built previously: random forest using all 50 markers
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-md <- as.data.frame(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
+md <- as.data.frame(subset(t(ctallgood.norm), 
+                           (sampleinfo$sex == "F" &
                  sampleinfo$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") & 
  #               sampleinfo$codeset == "phaw_1" &
                   sampleinfo$qual != "bad"&
-                  sampleinfo$over10reads >20 &
+                  sampleinfo$over10reads >40 &
                  sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR", "OR-A")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD","Areg", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8", "Sreg"))))
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD","Areg", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8", "Sreg"))) | 
+   sampleinfo$type == "OR-A"
+ ))
 
 
 md$rfagepred <- predict(rfagemodel, newdata= md)
@@ -114,10 +117,18 @@ t.test(md$lmresid[md$reg =="R"] , alternative="less" )
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+#md$regentime <- as.numeric(md$regentime)
+#md$regentime[is.na(md$regentime)] 
+md$regentime[md$regentime== ""] <- "unregenerated samples"
+md$regentime <- factor(md$regentime, levels= c("unregenerated samples", "4", "7", "13"))
 
+mds <- subset
 
-
-ggplot(md, aes(x=regentime, y=lmresid, fill=regentime))+geom_boxplot()
+ggplot(md, aes(x=regentime, y=lmresid, fill=regentime))+
+  geom_boxplot(outlier.shape=NA)+
+ scale_fill_manual(values=c("grey", "aquamarine3","forest green", "limegreen",  "red2"), name="")+
+  ylab("Residual variation in molecular age")+
+  xlab("Time after regeneration (weeks)")+theme_bw()
 
 
 ```

@@ -548,14 +548,22 @@ md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
   filter(!(is.na(predage))) %>%
   column_to_rownames(var="sample")
 
+mtry <- seq(5,15, length.out = 3)
 
+min.node.size <- seq(5,25, length.out = 5)
+
+splitrule= c("extratrees", "variance")
+
+
+
+tunegrid <- expand.grid(mtry=mtry, splitrule=splitrule, min.node.size=min.node.size)
 
 
 rfagemodel <- train(
   predage~.,
   tuneLength = 4,
-  data = md, method = "ranger",
-  trControl = trainControl(method = "cv", number = 5, verboseIter = F)
+  data = md, method = "ranger",tuneGrid=tunegrid,
+  trControl = trainControl(method = "cv",number = 5, verboseIter = T)
 )
 
 rfagemodel
@@ -617,7 +625,11 @@ save(rfagemodel, file="rfagemodel.rdata")
 
 So we can use our marker set to very accurately predict a sample's age. 
 
+#Interrogating the model
 
 
-
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+summary(rfagemodel)
+print(rfagemodel)
+```
 
