@@ -22,7 +22,7 @@ library(ggrepel)
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-setwd("~/Documents/nstringjul18")
+setwd("~/Documents/nstringjul18/nstringfull")
 load(file="allns_data.rdata")
 load(file="rfagemodel.rdata")
 
@@ -76,18 +76,25 @@ md$typer <- paste0(md$type, md$regentime)
 
 
 lm <- lm(rfagepred~predage, data=md)
+ 
+#lm <- lm(rfagepred~predage, data=subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") ))
+                 
 md$lmresid <- lm$residuals
 md$lmressign <- md$lmresid >0
 
-ggplot(md, aes(x=predage, y=rfagepred))+
+(p=ggplot(md, aes(x=predage, y=rfagepred))+
   geom_point(aes(colour=typer))+
   xlab("Age (weeks) from body length") +
   ylab("Age (weeks) from marker gene expression (random forest model)")+
-  geom_smooth(method="lm", colour="black")+
+#  geom_line(aes(predage, lm
+#  geom_smooth(method="lm")+
+  geom_smooth(method="lm", colour="black", data=subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") ))+
   theme_bw()+
  scale_colour_manual(values=c("darkviolet", "cornflower blue", "aquamarine3","forest green", "limegreen",  "red2"), name="")+
   geom_text_repel(aes(label=sample,colour=typer), size=2.5)+
-  ggtitle("How does regeneration affect molecular age?")
+  ggtitle("How does regeneration affect molecular age?"))
+
+ggsave(plot=p, file="rejuvdet.pdf")
 ```
 
 There may be an overall trend! Lets look at this in more detail
@@ -124,12 +131,13 @@ md$regentime <- factor(md$regentime, levels= c("unregenerated samples", "4", "7"
 
 mds <- subset
 
-ggplot(md, aes(x=regentime, y=lmresid, fill=regentime))+
+p=ggplot(md, aes(x=regentime, y=lmresid, fill=regentime))+
   geom_boxplot(outlier.shape=NA)+
  scale_fill_manual(values=c("grey", "aquamarine3","forest green", "limegreen",  "red2"), name="")+
   ylab("Residual variation in molecular age")+
   xlab("Time after regeneration (weeks)")+theme_bw()
 
+ggsave(plot=p, file="regtimeeff.pdf")
 
 ```
 
