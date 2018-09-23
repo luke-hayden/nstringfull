@@ -109,6 +109,102 @@ ct1015.unnorm$rowname <- NULL
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
+setwd("~/nstringn17/ctg5and6")
+ct5and6.raw <- read.markup.RCC()
+
+
+setwd("~/nstringn17/ctg5hi")
+ct5and6hi.raw <- read.markup.RCC()
+
+
+setwd("~/nstringn17/ctg7and8")
+ct7and8.raw <- read.markup.RCC()
+
+
+setwd("~/nstringn17/ctg7and8hi")
+ct7and8hi.raw <- read.markup.RCC()
+
+setwd("~/nstringn17/ctg3and4")
+
+ct3and4.raw <- read.markup.RCC()
+
+
+setwd("~/nstringn17/ctg1and2")
+
+ct1and2.raw <- read.markup.RCC()
+
+
+setwd("~/nstringn17/ctg9")
+
+ct9.raw <- read.markup.RCC()
+
+
+
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+hknames <- rownames(ctg1011.matr)[210:214]
+
+
+t <- ct1011.raw
+t$x$CodeClass <- "Endogenous"
+ctg1011.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+hknames <- rownames(ctg1011.matr)[210:214]
+ctg1011.hk <- subset(ctg1011.matr, rownames(ctg1011.matr) %in% hknames)
+
+
+t <- ct1213.raw
+t$x$CodeClass <- "Endogenous"
+ctg1213.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+ctg1213.hk <- subset(ctg1213.matr, rownames(ctg1213.matr) %in% hknames)
+
+t <- ct14.raw
+t$x$CodeClass <- "Endogenous"
+ctg14.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+ctg14.hk <- subset(ctg14.matr, rownames(ctg14.matr) %in% hknames)
+
+t <- ct15.raw
+t$x$CodeClass <- "Endogenous"
+ctg15.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+ctg15.hk <- subset(ctg15.matr, rownames(ctg15.matr) %in% hknames)
+
+
+t <- ct1and2.raw
+t$x$CodeClass <- "Endogenous"
+ctg1and2.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+ctg1and2.hk <- subset(ctg1and2.matr, rownames(ctg1and2.matr) %in% hknames)
+
+t <- ct3and4.raw
+t$x$CodeClass <- "Endogenous"
+ctg3and4.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+ctg3and4.hk <- subset(ctg3and4.matr, rownames(ctg3and4.matr) %in% hknames)
+
+t <- ct5and6hi.raw
+t$x$CodeClass <- "Endogenous"
+ctg5and6hi.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+ctg5and6hi.hk <- subset(ctg5and6hi.matr, rownames(ctg5and6hi.matr) %in% hknames)
+
+t <- ct7and8hi.raw
+t$x$CodeClass <- "Endogenous"
+ctg7and8hi.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+ctg7and8hi.hk <- subset(ctg7and8hi.matr, rownames(ctg7and8hi.matr) %in% hknames)
+
+t <- ct9.raw
+t$x$CodeClass <- "Endogenous"
+ctg9.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+ctg9.hk <- subset(ctg9.matr, rownames(ctg9.matr) %in% hknames)
+
+
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
 
 load(file="nov17main_data.rdata")
 load(file="markerchoiceinfo.rdata")
