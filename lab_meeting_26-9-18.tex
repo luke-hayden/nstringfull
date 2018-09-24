@@ -1,0 +1,154 @@
+\documentclass[ignorenonframetext,]{beamer}
+\setbeamertemplate{caption}[numbered]
+\setbeamertemplate{caption label separator}{: }
+\setbeamercolor{caption name}{fg=normal text.fg}
+\beamertemplatenavigationsymbolsempty
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\fi
+\usetheme[]{Darmstadt}
+\usecolortheme{fly}
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\newif\ifbibliography
+\hypersetup{
+            pdftitle={Lab Meeting},
+            pdfauthor={Luke Hayden},
+            pdfborder={0 0 0},
+            breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+
+% Prevent slide breaks in the middle of a paragraph:
+\widowpenalties 1 10000
+\raggedbottom
+
+\AtBeginPart{
+  \let\insertpartnumber\relax
+  \let\partname\relax
+  \frame{\partpage}
+}
+\AtBeginSection{
+  \ifbibliography
+  \else
+    \let\insertsectionnumber\relax
+    \let\sectionname\relax
+    \frame{\sectionpage}
+  \fi
+}
+\AtBeginSubsection{
+  \let\insertsubsectionnumber\relax
+  \let\subsectionname\relax
+  \frame{\subsectionpage}
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{0}
+
+\title{Lab Meeting}
+\author{Luke Hayden}
+\date{26th September 2018}
+
+\begin{document}
+\frame{\titlepage}
+
+\begin{frame}{Background}
+
+\begin{block}{Project}
+
+Examine the effect of regeneration on the molecular age profile of
+\emph{Parhyale} limbs
+
+\end{block}
+
+\begin{block}{Designing codeset}
+
+*Nanostring as method to quantify gene expression
+
+*200 genes in codeset
+
+-195 genes chosen on the basis of differential expression analysis
+
+-5 control genes: do not vary in expression between conditions
+
+\end{block}
+
+\end{frame}
+
+\begin{frame}{Age-length relationship}
+
+\end{frame}
+
+\begin{frame}{Building an age-length model}
+
+\end{frame}
+
+\begin{frame}{Model performance}
+
+\end{frame}
+
+\begin{frame}{Young vs old separation}
+
+Using age classes: old vs young (plus middle)
+
+\end{frame}
+
+\begin{frame}{Multiple Regression approach}
+
+\begin{block}{Model overfitting}
+
+\begin{block}{Simple linear regression:}
+
+\textbf{Age = X(marker1) + c}
+
+We try to find values for x \& c that come as close as possible to
+solving the equation for each set of values for \emph{Age} and
+\emph{marker1} we have.
+
+\end{block}
+
+\begin{block}{Two predictors:}
+
+\textbf{Age = X(marker1) + Y(marker2) + c}
+
+\end{block}
+
+\begin{block}{Many predictors}
+
+\textbf{Age = X(marker1) + Y(marker2) + Z(marker3) + W(marker4) +
+\ldots{}. + c}
+
+Where we have many different markers, we can find values of x,y,z,w, etc
+that solve this equation very well, not because we
+
+\end{block}
+
+\end{block}
+
+\end{frame}
+
+\begin{frame}{}
+
+\end{frame}
+
+\end{document}

@@ -394,7 +394,7 @@ md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
                  sampleinfo$type %in% c("O", "Y", "M")& 
   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
 
-chosenformodel <- as.character(cvdf$name[cvdf$regencv >1])
+#chosenformodel <- as.character(cvdf$name[cvdf$regencv >1])
                               
 #chosenformodel <- as.character(vardat$name[vardat$regencv>1])
 #chosenformodel <- as.character(lmdf2$name[lmdf2$rsq>0.05])
@@ -413,13 +413,26 @@ md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
   column_to_rownames(var="sample")
 
 
+trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
+trdat <- md[trainchoice,]
+tedat <- md[-trainchoice,]
+
+tunegrid <- expand.grid(mtry=c(1:15), 
+                        splitrule="extratrees", 
+                        min.node.size=c(1:15))
+
+tunegrid <- expand.grid(mtry=12, 
+                        splitrule="extratrees", 
+                        min.node.size=2)
+
 
 
 rfagemodel <- train(
   predage~.,
   tuneLength = 4,
-  data = md, method = "ranger",
-  trControl = trainControl(method = "cv", number = 5, verboseIter = F)
+  data = trdat, method = "ranger",
+  tuneGrid=tunegrid,
+  trControl = trainControl(method = "cv", number = 5, verboseIter = T)
 )
 
 rfagemodel
@@ -429,29 +442,40 @@ rfagemodel
 
 ```
 
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````
+
 ##Model accuracy: age from body length regression
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-md$rfagepred <- predict(rfagemodel)
+md$intrain <- rownames(md) %in% rownames(trdat)
+
+
+md$rfagepred <- predict(rfagemodel, newdata=md)
 
 md <- md %>%
   rownames_to_column(var="sample") %>%
   left_join(select(sampleinfo, -predage), by="sample")
 
 
-accrf <- lm(predage~rfagepred, md)
+#accrf <- lm(predage~rfagepred, subset(md, md$intrain==F))
 
 
 ggplot(md, aes(x=predage, y=rfagepred))+
-  geom_point(aes(colour=type))+
+  geom_point(aes(colour=intrain))+
   xlab("Age (weeks) from body length") +
   ylab("Age (weeks) from marker gene expression (random forest model)")+
   geom_smooth(method="lm", colour="black")+
   theme_bw()+
- scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
-  geom_text_repel(aes(label=sample,colour=type), size=2.5)+
-  ggtitle("Using Marker gene expression to predict age", subtitle=paste("R^2 of correlation between measure from length and from gene expression:", round(summary(accrf)$r.squared, 3)))
+# scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age")#, subtitle=paste("R^2 of correlation between measure from length and from gene expression:", round(summary(accrf)$r.squared, 3)))
 
 
 ```
