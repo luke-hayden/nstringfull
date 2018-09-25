@@ -151,7 +151,7 @@ bc.groups <- bcmin.groups
 
 
 ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+ggtitle("PCA of Old vs Young (females): 50 chosen markers")+
-    theme_minimal() +
+    theme_bw() +
 #  scale_colour_manual(values=c("cornflower blue", "red3", "black"))+
   theme(plot.title=element_text(size=8,face="bold"))+
 #  geom_label(label=rownames(tbc), aes(colour=bc.groups))+
