@@ -37,7 +37,7 @@ load(file="markerchoiceinfo.rdata")
 
 load(file="rfagemodel.rdata")
 
-
+load(file="trterfagemodel.rdata")
 ```
 
 
@@ -80,7 +80,10 @@ ggplot(lena, aes(y=length, x=wkage))+
   scale_colour_brewer(palette="Set1")+
   ggtitle("Age-length relationship in female Parhyale")+
   ylab("Body length (mm)")+
-  xlab("Age (weeks)")
+  xlab("Age (weeks)")+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
 
 
 
@@ -121,7 +124,10 @@ ggplot(lena, aes(x=wkage, y=sqpred))+
   scale_colour_brewer(palette="Set1")+
   ggtitle("Model predicted vs real values", subtitle="")+
   xlab("Age (weeks): predicted")+
-  ylab("Age (weeks): real data")+geom_smooth(method="lm")
+  ylab("Age (weeks): real data")+geom_smooth(method="lm")+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
 
 ````
 
@@ -155,7 +161,10 @@ ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, v
 #  scale_colour_manual(values=c("cornflower blue", "red3", "black"))+
   theme(plot.title=element_text(size=8,face="bold"))+
 #  geom_label(label=rownames(tbc), aes(colour=bc.groups))+
-  scale_colour_manual(values= c("darkviolet","cornflower blue",  "red2"))
+  scale_colour_manual(values= c("darkviolet","cornflower blue",  "red2"))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
 
 
 ````
@@ -231,7 +240,10 @@ ggplot(mnmd, aes(x= sname, y=normexp, colour=type))+
   scale_fill_manual(values=c("darkviolet", "cornflower blue", "red3"))+
   theme(axis.text.x = element_text(angle = 60, hjust = 1))+
   ylab("Normalised Expression") +
-  xlab('Marker')
+  xlab('Marker')+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
   
 
 
@@ -345,7 +357,10 @@ ggplot(mnmd, aes(x=predage, y=normexp))+
 #  xlab('pre')+
   facet_grid(dir~ca)+
   scale_colour_manual(values=c("grey", "forest green"))+
-  xlab("Sample age")
+  xlab("Sample age")+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
 ```
 
 
@@ -369,7 +384,15 @@ Where we have many different markers, we can find values of x,y,z,w, etc that so
 
 #Random Forest approach
 
+###Decision tree
 
+Classify or perform regression by asking binary questions of data: whether value of marker X is above or below key value Y, whther marker Z is above or below.....
+
+###Random Forest
+
+Ensemble of decision trees, each using a random subset of the predictors
+
+Resists overfitting
 
 #Examining this model
 
@@ -397,7 +420,10 @@ ggplot(md, aes(x=predage, y=rfagepred))+
   theme_bw()+
  scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
   geom_text_repel(aes(label=sample), size=2.5)+
-  ggtitle("Using Marker gene expression to predict age")
+  ggtitle("Using Marker gene expression to predict age")+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
 
 
 ```
@@ -407,15 +433,33 @@ ggplot(md, aes(x=predage, y=rfagepred))+
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+olddat <- trterfagemodel$trainingData
 
-md <-modelsamptrte
 
-md$intrain <- md$sample %in% rownames(trdat)
+md <- as.data.frame(subset(t(ctall.norm), 
+                           (sampleinfo$sex == "F" &
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+               sampleinfo$codeset == "phaw_1" &
+                  sampleinfo$qual != "bad"&
+ #                 sampleinfo$over10reads >40 &
+                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD","Areg", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))) 
+ ))
+
+md <- md[, colnames(md) %in% colnames(olddat)]
+
+#md <-modelsamptrte
+
+md$intrain <- rownames(md) %in% rownames(olddat)
 
 
 md$trterfagepred <- predict(trterfagemodel, newdata=md)
 
+md$sample <- rownames(md)
 
+
+md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
+  filter(!(is.na(predage))) 
 
 accrf <- lm(predage~trterfagepred, subset(md, md$intrain==F))
 
@@ -428,7 +472,10 @@ ggplot(md, aes(x=predage, y=trterfagepred))+
   theme_bw()+
 # scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
   geom_text_repel(aes(label=sample), size=2.5)+
-  ggtitle("Using Marker gene expression to predict age")
+  ggtitle("Using Marker gene expression to predict age")+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
 
 
 ```
@@ -492,13 +539,19 @@ md$lmressign <- md$lmresid >0
   theme_bw()+
     scale_colour_manual(values=c("darkviolet", "cornflower blue", "forest green",  "red2"), name="")+
   geom_text_repel(aes(label=sample,colour=type), size=2.5)+
-  ggtitle("How does regeneration affect molecular age?"))
+  ggtitle("How does regeneration affect molecular age?"))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
 ````
 
 
 #Testing this effect
 
+Variably significant or not depending on details of model (choice of markers used, etc)
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
 
 t.test(md$lmresid[md$reg =="R"] , alternative="less" )
   
@@ -506,5 +559,23 @@ t.test(md$lmresid[md$reg =="R"] , alternative="less" )
 ````
 
 
+
+
+#New questions
+
+###How to optimise model?
+Need to reduce out of sample error
+
+###Better way of ensuring sample quality?
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+  
+
+````
 
 
