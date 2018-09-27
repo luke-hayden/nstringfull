@@ -15,6 +15,28 @@ library(tidyr)
 library(caret)
 
 library(gtools)
+
+
+
+powerTransform <- function(y, lambda1, lambda2 = NULL, method = "boxcox") {
+
+  boxcoxTrans <- function(x, lam1, lam2 = NULL) {
+
+    # if we set lambda2 to zero, it becomes the one parameter transformation
+    lam2 <- ifelse(is.null(lam2), 0, lam2)
+
+    if (lam1 == 0L) {
+      log(y + lam2)
+    } else {
+      (((y + lam2)^lam1) - 1) / lam1
+    }
+  }
+
+  switch(method
+         , boxcox = boxcoxTrans(y, lambda1, lambda2)
+         , tukey = y^lambda1
+  )
+}
 ```
 
 
@@ -70,134 +92,76 @@ lena$lensq <- (lena$length)^2
 
 
 
-linmodel <- train(
-  wkage~length, lena,
-   method = "lm",
-  trControl = trainControl(
-    method = "cv", number = 5,
-    repeats = 5, verboseIter = TRUE
-  )
-)
+m <- lm(wkage~length, data=lena)
+summary(m)
 
-linmodel
+(bc <- MASS::boxcox(length~wkage, data=lena))
 
-lena$linpred <- predict(linmodel)
+(lambda <- bc$x[which.max(bc$y)])
 
+
+
+# re-run with transformation
+
+lena$bctranslen <- powerTransform(lena$length, lambda)
+mnew <- lm(wkage~bctranslen, data=lena )
+summary(mnew)
+
+
+lena$linpred <- predict(m)
 lena$linresid <- lena$wkage -lena$linpred
-```
+lena$bcpred <- predict(mnew)
+lena$bcresid <- lena$wkage -lena$bcpred
 
-###Log linear regression: age ~ log(length)
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-logmodel <- train(
-  wkage~loglen, lena,
-   method = "lm",
-  trControl = trainControl(
-    method = "cv", number = 5,
-    repeats = 5, verboseIter = TRUE
-  )
-)
-
-logmodel
-
-lena$logpred <- predict(logmodel)
-
-lena$logresid <-lena$wkage -lena$logpred
-
-```
-
-###Squared Linear regression: age ~ length^2
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-sqmodel <- train(
-  wkage~lensq, lena,
-   method = "lm",
-  trControl = trainControl(
-    method = "cv", number = 5,
-    repeats = 5, verboseIter = TRUE
-  )
-)
-
-sqmodel
-
-lena$sqpred <- predict(sqmodel)
-lena$sqresid <- lena$wkage -lena$sqpred
 
 
 ```
 
-###Random forest (probably a sledgehammer to crack a nut)
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-rfmodel <- train(
-  wkage~length, lena,
-   method = "rf",
-  trControl = trainControl(
-    method = "cv", number = 5,
-    repeats = 5, verboseIter = TRUE
-  )
-)
-
-rfmodel
-
-lena$rfpred <- predict(rfmodel)
-lena$rfresid <- lena$wkage -lena$rfpred
-
-```
-
-#Compare our models
-
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-mlena <- gather(lena,key="model", value="pred", c("sqpred", "linpred", "logpred", "rfpred"))
+mlena <- gather(lena, key="model", value="pred", c("bcpred", "linpred"))
 
 
-
-ggplot(mlena, aes(x=wkage, y=pred, colour=model))+
-  geom_point()+
-  facet_wrap(~model, ncol=2)+
+ggplot(mlena, aes(x=pred, y=length, colour=model))+
+  geom_smooth(aes(y=length, x=wkage), colour="forest green")+
+  geom_line(size=1.5) +
   theme_bw()+
-  scale_colour_brewer(palette="Set1")+
-  ggtitle("Model predicted vs real values", subtitle="3 types of regression + random forest")+
-  xlab("Age (weeks): predicted")+
-  ylab("Age (weeks): real data")+geom_smooth(method="lm")
-
-
-
-
-
-#mlena <- gather(lena,key="model", value="pred", c("sqpred", "linpred", "logpred", "wkage"))
-ggplot(mlena, aes(y=length, x=pred, colour=model))+
-  geom_point()+
   geom_point(aes(x=wkage), colour="black")+
-  facet_wrap(~model, ncol=2)+
-  theme_bw()+
   scale_colour_brewer(palette="Set1")+
-  ggtitle("Predictions of models: length vs age", subtitle="3 types of regression + random forest \n black points: real values")+
-  xlab("Body length (mm)")+
-  ylab("Age (weeks)")
+  xlab("Age (weeks)")+
+  ylab("Body length (mm)")+
+  ggtitle(label= "Linear regression age vs length", 
+          subtitle=paste0("linear model R-squared: ", round(summary(m)$r.squared, 3), 
+                 "\nBox-cox transformed linear model R-squared: ", round(summary(mnew)$r.squared, 3)))#+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Model", labels=c("Box-cox transformed", "Linear untransformed"))
   
 
-
-mlena <- gather(lena,key="model", value="resid", c("sqresid", "linresid", "logresid", "rfresid"))
-ggplot(mlena, aes(x=wkage, y=resid, colour=model))+
-  geom_bar(stat='identity')+
-  facet_wrap(~model, ncol=1)+
-  theme_bw()+
-  scale_colour_brewer(palette="Set1")+
-  ggtitle("Model residuals", subtitle="3 types of regression + random forest")+
-  ylab("Residual")+
-  xlab("Age (weeks)")
-
 ```
-
-The best model is the linear regression of the squared length. With this, we get a very nice predictive power: `sqmodel$results`  Let's use this to predict the age of all samples where we only have length and not age. The accuracy of this model is very high, which is great!
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-sampleinfo$lensq <-sampleinfo$length^2
-sampleinfo$predage <- NA
 
-sampleinfo$predage[!is.na(sampleinfo$lensq)] <- predict(sqmodel, newdata=sampleinfo)
+
+mlena <- gather(lena, key="model", value="resid", c("bcresid", "linresid"))
+
+ggplot(mlena, aes(y=resid, x=length, colour=model))+
+  geom_point()+
+  scale_colour_brewer(palette="Set1")+
+  theme_bw()+
+  facet_wrap(~model)
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+sampleinfo$predage <- NULL
+preddf <-subset(sampleinfo, !is.na(sampleinfo$length))
+
+preddf$bctranslen <- powerTransform(preddf$length, lambda)
+preddf$predage <-  predict(mnew, newdata=preddf)
+
+
+sampleinfo <- left_join(sampleinfo, dplyr::select(preddf, sample, predage), by="sample")
+
 
 ```
 

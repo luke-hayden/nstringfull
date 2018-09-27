@@ -29,6 +29,7 @@ load(file="allns_data.rdata")
 
 save(cvdf,lmdf, lmdf2,  file="vardat.rdata")
 load(file="vardat.rdata")
+
 ````
 
 
@@ -40,14 +41,16 @@ load(file="vardat.rdata")
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"& 
                  sampleinfo$prep== "Luke"&
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY", "regen") & 
  #                sampleinfo$ctg>2 & 
                 sampleinfo$codeset == "phaw_1" &
                  sampleinfo$type %in% c("O", "Y", "M")
 &   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))
 ))
 
-md <- md[,minf$chosenand ==T]
+#md <- md[,minf$chosenand ==T]
+md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05] 
+
 
 md$sample <- rownames(md)
 
@@ -57,14 +60,11 @@ md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
 
 
 trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
+
+
+#trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
 trdat <- md[trainchoice,]
 tedat <- md[-trainchoice,]
-
-tunegrid <- expand.grid(mtry=c(10:20), 
-                        splitrule=c("extratrees", "variance"),
-                        min.node.size=c(1:10))
-
-#tunegrid <- expand.grid(mtry=16,  splitrule="extratrees",  min.node.size=7)
 
 
 
@@ -73,14 +73,11 @@ rfagemodel <- train(
   tuneLength = 4,
   metric="RMSE",
   data = trdat, method = "ranger",
-  tuneGrid=tunegrid,
-  trControl = trainControl(method = "cv", number = 50, verboseIter = T)
+  tuneGrid=expand.grid(mtry=c(10:20), 
+                        splitrule=c("extratrees", "variance"),
+                        min.node.size=c(1:10)),
+  trControl = trainControl(method = "cv", number = 40, verboseIter = T)
 )
-
-#print("random forest:")
-#summary(rfagemodel)
-#plot(rfagemodel)
-
 ```
 
 
@@ -96,26 +93,28 @@ rfagemodel
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
+mymodel <- currbest
+mymodel <- rfagemodel
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"& 
                  sampleinfo$prep== "Luke"&
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY", "regen") & 
  #                sampleinfo$ctg>2 & 
                 sampleinfo$codeset == "phaw_1" &
                  sampleinfo$type %in% c("O", "Y", "M")& 
   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
 
-md <- md[,minf$chosenand ==T]
-
-md$rfagepred <- predict(rfagemodel, newdata=md)
 
 
-md$rfagepred <- predict(currbest, newdata=md)
+md <- md[,colnames(md) %in% mymodel$coefnames]
 
 
-md$intrain <- rownames(md) %in% rownames(rfagemodel$trainingData)
+
+md$rfagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
 
 
 
@@ -123,11 +122,19 @@ md <- md %>%
   rownames_to_column(var="sample") %>%
   left_join(sampleinfo,  by="sample")
 
+md <- subset(md, !(is.na(md$predage)))
+
 
 #md$rfagepred <- predict(rfagemodel, newdata=md)
 
 accrf <- lm(predage~rfagepred, subset(md, md$intrain==F))
 
+
+
+(RMSEtr <- sqrt(mean( (md$rfagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2)))
+
+
+(RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2)))
 
 ggplot(md, aes(x=predage, y=rfagepred,colour=intrain))+
   geom_point()+
@@ -135,12 +142,69 @@ ggplot(md, aes(x=predage, y=rfagepred,colour=intrain))+
   ylab("Age (weeks) from marker gene expression (random forest model)")+
   geom_smooth(method="lm", colour="black")+
   theme_bw()+
-# scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
   geom_text_repel(aes(label=sample), size=2.5)+
-  ggtitle("Using Marker gene expression to predict age", subtitle=paste("R^2 of correlation between measure from length and from gene expression:", round(summary(accrf)$r.squared, 3)))#+  facet_wrap(~intrain)
+  ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("RMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3)))#+  facet_wrap(~intrain)
+
 
 
 ```
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+save(currbest, rfagemodel22, rfagemodel, file="models.rdata")
+
+```
+
+###Random forest: current best attempt
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"& 
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")
+&   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))
+))
+
+#md <- md[,minf$chosenand ==T]
+md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05] 
+
+
+md$sample <- rownames(md)
+
+md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
+  filter(!(is.na(predage))) %>%
+  column_to_rownames(var="sample")
+
+
+trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
+
+
+trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+trdat <- md[trainchoice,]
+tedat <- md[-trainchoice,]
+
+
+
+rfagemodel <- train(
+  predage~.,
+  tuneLength = 4,
+  metric="RMSE",
+  data = trdat, method = "ranger",
+  tuneGrid=expand.grid(mtry=c(10:20), 
+                        splitrule=c("extratrees", "variance"),
+                        min.node.size=c(1:10)),
+  trControl = trainControl(method = "cv", number = 40, verboseIter = T)
+)
+```
+
 
 ##Model accuracy: cohort age data
 

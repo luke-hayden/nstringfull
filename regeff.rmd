@@ -40,20 +40,25 @@ Model built previously: random forest using all 50 markers
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-md <- as.data.frame(subset(t(ctallgood.norm), 
+md <- as.data.frame(subset(t(ctall.norm), 
                            (sampleinfo$sex == "F" &
                  sampleinfo$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") & 
- #               sampleinfo$codeset == "phaw_1" &
+                sampleinfo$codeset == "phaw_1" &
                   sampleinfo$qual != "bad"&
                   sampleinfo$over10reads >40 &
-                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR", "OR-A")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD","Areg", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8", "Sreg"))) | 
-   sampleinfo$type == "OR-A"
+                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD","Areg", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))) 
+ #|    sampleinfo$type == "OR-A"
  ))
 
 
-md$rfagepred <- predict(rfagemodel, newdata= md)
 
+mymodel <- rfagemodel
+md <- md[, colnames(md) %in% mymodel$coefnames]
+
+
+
+md$rfagepred <- predict(mymodel, newdata= md)
 
 
 
@@ -72,8 +77,6 @@ md$type <- as.factor(case_when(
 md$regentime[is.na(md$regentime)] <- ""
 
 
-md$typer <- paste0(md$type, md$regentime)
-
 
 lm <- lm(rfagepred~predage, data=md)
  
@@ -82,19 +85,28 @@ lm <- lm(rfagepred~predage, data=md)
 md$lmresid <- lm$residuals
 md$lmressign <- md$lmresid >0
 
+md$regen <- ifelse(md$reg =="" , "unregenerated", "regenerated"         )
+
+
+tt <-t.test(md$lmresid[md$reg =="R"] , alternative="less" )
+
+
+
+
 (p=ggplot(md, aes(x=predage, y=rfagepred))+
-  geom_point(aes(colour=typer))+
+  geom_point(aes(colour=regen))+
   xlab("Age (weeks) from body length") +
   ylab("Age (weeks) from marker gene expression (random forest model)")+
 #  geom_line(aes(predage, lm
 #  geom_smooth(method="lm")+
   geom_smooth(method="lm", colour="black", data=subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") ))+
   theme_bw()+
- scale_colour_manual(values=c("darkviolet", "cornflower blue", "aquamarine3","forest green", "limegreen",  "red2"), name="")+
-  geom_text_repel(aes(label=sample,colour=typer), size=2.5)+
-  ggtitle("How does regeneration affect molecular age?"))
+ scale_colour_manual(values=c("forest green", "dark grey"), name="")+
+  geom_text_repel(aes(label=sample,colour=regen), size=2.5)+
+  ggtitle("How does regeneration affect molecular age?", 
+          subtitle= paste0("one-sided t-test p-value on residuals of regenerated: ", round(tt$p.value,3))))
 
-ggsave(plot=p, file="rejuvdet.pdf")
+#ggsave(plot=p, file="rejuvdet.pdf")
 ```
 
 There may be an overall trend! Lets look at this in more detail
@@ -115,7 +127,6 @@ ggplot(md, aes(x=predage, y=rfagepred))+
 ##Test the significance of this effect
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
 t.test(md$lmresid[md$reg =="R"] , alternative="less" )
   
 
