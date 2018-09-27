@@ -24,7 +24,7 @@ library(ggrepel)
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 setwd("~/Documents/nstringjul18/nstringfull")
 load(file="allns_data.rdata")
-load(file="rfagemodel.rdata")
+load(file="models.rdata")
 
 
 ````
