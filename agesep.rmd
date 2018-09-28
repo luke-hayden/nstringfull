@@ -23,8 +23,9 @@ library(FinCal)
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-setwd("~/Documents/nstringjul18")
+#setwd("~/Documents/nstringjul18")
 load(file="allns_data.rdata")
+load(file="markerchoiceinfo.rdata")
 
 ````
 
@@ -64,6 +65,65 @@ ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, v
   theme(plot.title=element_text(size=8,face="bold"))+
 #  geom_label(label=rownames(tbc), aes(colour=bc.groups))+
   scale_colour_manual(values= c("darkviolet","cornflower blue",  "red2"))
+
+
+````
+
+
+
+#Old vs young by marker
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+md <- t(subset(t(ctall.norm), sampleinfo$sex == "F" &
+  #              sampleinfo$qual == "ok"& 
+                 sampleinfo$exp %in% c("OvY", "Size-age", "cohorts") & 
+                 sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+si <- subset(sampleinfo, sampleinfo$sample %in% colnames(md))
+old <- t(subset(t(md), si$age == "O"))
+young <- t(subset(t(md), si$age == "Y"))
+#regen <- t(subset(t(ctg1to9), sampleinfo$type == "OR" & sampleinfo$qual != "bad"))
+
+
+
+
+
+nmd <- as.data.frame(md/rowMeans(md))
+
+
+ns <- colnames(md)
+
+nmd$name <- rownames(md)
+nmd$sname <- substr(nmd$name, 1,2)
+
+
+sl <- as.character(sampleinfo$sample[sampleinfo$sample %in% colnames(nmd)])
+
+mmd <- gather(as.data.frame(md), key="sample", value="expression", sl)
+
+mnmd <- gather(nmd, key="sample", value="normexp", sl) %>%
+  left_join(sampleinfo, by= "sample") %>%
+  left_join(mmd, by="sample")
+
+
+ggplot(mnmd, aes(x= sname, y=normexp, colour=type))+
+#  geom_point()+
+  theme_bw()+
+  geom_boxplot(outlier.shape=NA)+
+  scale_y_continuous(trans="log2")+
+  facet_grid(~dir, space="free",scales="free" )+
+#  geom_boxplot(outlier.shape = NA)+
+  scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
+  scale_fill_manual(values=c("darkviolet", "cornflower blue", "red3"))+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  ylab("Normalised Expression") +
+  xlab('Marker')
+  
 
 
 ````
@@ -238,7 +298,7 @@ nmd$di <- paste0(ifelse(nmd$dir == "upregulated with age", "up", "down"), ": ", 
 
 
 
-##Expression/length relationship
+##Expression/age regression
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
@@ -268,12 +328,15 @@ ggplot(mnmd, aes(x=predage, y=normexp))+
 #  xlab('pre')+
   facet_grid(dir~ca)+
   scale_colour_manual(values=c("grey", "forest green"))
+
+
+grsq <- unique(mnmd$name[mnmd$rsq>0.04])
 ```
 
 
 
 
-##Old vs young by marker
+#Old vs young by marker
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
@@ -305,6 +368,28 @@ ggplot(mnmd, aes(x= sname, y=normexp, colour=type))+
 
 
 
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+mnmd2 <- subset(mnmd,mnmd$name %in% minf$name[ minf$chosenand ==T])
+
+
+ggplot(mnmd2, aes(x= sname, y=normexp, colour=type))+
+#  geom_point()+
+  theme_bw()+
+  geom_boxplot(outlier.shape=NA)+
+  scale_y_continuous(trans="log2")+
+  facet_grid(~dir, space="free",scales="free" )+
+#  geom_boxplot(outlier.shape = NA)+
+  scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
+  scale_fill_manual(values=c("darkviolet", "cornflower blue", "red3"))+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  ylab("Normalised Expression") +
+  xlab('Marker')
+  
+````
+
+
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
@@ -321,339 +406,3 @@ md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 cvdf <- data.frame(name= colnames(md), 
  regencv = coefficient.variation(colMeans(md), apply(md,2, sd)))
 ```
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-md <- t(subset(t(ctall.norm), sampleinfo$sex == "F" &
-  #              sampleinfo$qual == "ok"& 
- #                sampleinfo$exp %in% c("OvY", "Size-age", "cohorts") & 
-                 sampleinfo$ctg>2 & 
-   sampleinfo$prep =="Luke"&
-                sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$type %in% c("OR")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
-
-si <- subset(sampleinfo, sampleinfo$sample %in% colnames(md))
-
-
-
-nmd <- as.data.frame(md/rowMeans(md))
-
-
-
-ns <- colnames(md)
-
-nmd$name <- rownames(md)
-nmd$sname <- substr(nmd$name, 1,2)
-
-
-nmd <- left_join(nmd, geneinf, by="name")
-mnmd <- gather(nmd, key="sample", value="normexp", ns)
-
-
-mnmd <- left_join(mnmd, sampleinfo, by="sample") %>%
-  left_join(cvdf, by="name")
-
-mnmd$sname <- factor(mnmd$sname, levels=mnmd$sname[order(mnmd$regencv)])
-
-
-
-
-ggplot(mnmd, aes(x=sname , y=normexp, colour=in61))+
-  geom_point()+
-#  geom_boxplot()+
-  scale_y_continuous(trans="log2")
- # geom_text(cvdf, aes(x=sname, y=10, label=regencv), angle=60)
- 
-
-
-````
-
-
-
-#Models of age based on marker gene expression
-
-##Building the model:
-
-###Multiple linear regression: 
-
-Complete failure of model due to overfitting. Need a better method!
-
-###Random forest
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
-#               sampleinfo$qual == "ok"& 
-                 sampleinfo$prep== "Luke"&
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
- #                sampleinfo$ctg>2 & 
-#                sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$type %in% c("O", "Y", "M")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
-
-#chosenformodel <- as.character(cvdf$name[cvdf$regencv >1])
-                              
-#chosenformodel <- as.character(vardat$name[vardat$regencv>1])
-#chosenformodel <- as.character(lmdf2$name[lmdf2$rsq>0.05])
-
-#chosenformodel <- as.character(lmdf2$name[lmdf2$in61==T &lmdf2$rsq>0.05])
-
-#chosenformodel <- as.character(lmdf2$name[lmdf2$in61==T])
-
-#md <- md[,colnames(md) %in% chosenformodel]
-md <- md[,minf$chosenand ==T]
-
-md$sample <- rownames(md)
-
-md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
-  filter(!(is.na(predage))) %>%
-  column_to_rownames(var="sample")
-
-
-trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
-trdat <- md[trainchoice,]
-tedat <- md[-trainchoice,]
-
-tunegrid <- expand.grid(mtry=c(1:15), 
-                        splitrule="extratrees", 
-                        min.node.size=c(1:15))
-
-tunegrid <- expand.grid(mtry=12, 
-                        splitrule="extratrees", 
-                        min.node.size=2)
-
-
-
-rfagemodel <- train(
-  predage~.,
-  tuneLength = 4,
-  data = trdat, method = "ranger",
-  tuneGrid=tunegrid,
-  trControl = trainControl(method = "cv", number = 5, verboseIter = T)
-)
-
-rfagemodel
-#print("random forest:")
-#summary(rfagemodel)
-#plot(rfagemodel)
-
-```
-
-
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-````
-
-##Model accuracy: age from body length regression
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-md$intrain <- rownames(md) %in% rownames(trdat)
-
-
-md$rfagepred <- predict(rfagemodel, newdata=md)
-
-md <- md %>%
-  rownames_to_column(var="sample") %>%
-  left_join(select(sampleinfo, -predage), by="sample")
-
-
-#accrf <- lm(predage~rfagepred, subset(md, md$intrain==F))
-
-
-ggplot(md, aes(x=predage, y=rfagepred))+
-  geom_point(aes(colour=intrain))+
-  xlab("Age (weeks) from body length") +
-  ylab("Age (weeks) from marker gene expression (random forest model)")+
-  geom_smooth(method="lm", colour="black")+
-  theme_bw()+
-# scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
-  geom_text_repel(aes(label=sample), size=2.5)+
-  ggtitle("Using Marker gene expression to predict age")#, subtitle=paste("R^2 of correlation between measure from length and from gene expression:", round(summary(accrf)$r.squared, 3)))
-
-
-```
-
-##Model accuracy: cohort age data
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-  
-ggplot(md, aes(x=wkage, y=rfagepred))+
-  geom_point(aes(colour=type))+
-  xlab("Age (weeks): cohorts") +
-  ylab("Age (weeks) from marker gene expression (random forest model)")+
-  geom_smooth(method="lm", colour="black")+
-  theme_bw()+
- scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
-  geom_text_repel(aes(label=sample,colour=type), size=2.5)+
-  ggtitle("Using Marker gene expression to predict age", subtitle=paste("R^2 of correlation between actual age and \npredicted age based on gene expression with random forest model:", round(summary(lm(as.numeric(wkage)~rfagepred, md))$r.squared, 3)))
-
-
-
-
-save(rfagemodel, file="rfagemodel.rdata")
-
-```
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-
-
-
-md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY", "regen") & 
-               sampleinfo$codeset == "phaw_1" &
-                  sampleinfo$qual != "bad"&
-#                  sampleinfo$over10reads >70 &
-                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD","Areg","Xreg", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
-
-
-md$rfagepred <- predict(rfagemodel, newdata= md)
-
-
-
-
-md$sample <- rownames(md)
-
-md <- left_join(md, sampleinfo, by="sample") %>%
-  filter(!(is.na(predage)))
-
-md$type <- as.character(md$type)
-md$type <- as.factor(case_when(
-  md$type %in% c("O", "M", "Y") ~ as.character(md$type), 
-  md$type %in% c("MR", "YR", "OR") ~"R"
-))
-
-
-lm <- lm(rfagepred~predage, data=md)
-md$lmresid <- lm$residuals
-md$lmressign <- md$lmresid >0
-
-ggplot(md, aes(x=predage, y=rfagepred))+
-  geom_point(aes(colour=type))+
-  xlab("Age (weeks) from body length") +
-  ylab("Age (weeks) from marker gene expression (random forest model)")+
-  geom_smooth(method="lm", colour="black")+
-  theme_bw()+
- scale_colour_manual(values=c("darkviolet", "cornflower blue", "forest green", "red2"), name="")+
-  geom_text_repel(aes(label=sample,colour=type), size=2.5)+
-  ggtitle("How does regeneration affect molecular age?")
-
-
-t.test(md$lmresid[md$reg =="R"] , alternative="less" )
-  
-
-````
-
-
-
-###Random forest
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-md <- as.data.frame(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
-  #              sampleinfo$qual == "ok"& 
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
- #                sampleinfo$ctg>2 & 
-                sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$type %in% c("O", "Y", "M")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
-md$sample <- rownames(md)
-
-md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
-  filter(!(is.na(predage))) %>%
-  column_to_rownames(var="sample")
-
-mtry <- seq(5,15, length.out = 3)
-
-min.node.size <- seq(5,25, length.out = 5)
-
-splitrule= c("extratrees", "variance")
-
-
-
-tunegrid <- expand.grid(mtry=mtry, splitrule=splitrule, min.node.size=min.node.size)
-
-
-rfagemodel <- train(
-  predage~.,
-  tuneLength = 4,
-  data = md, method = "ranger",tuneGrid=tunegrid,
-  trControl = trainControl(method = "cv",number = 5, verboseIter = T)
-)
-
-rfagemodel
-#print("random forest:")
-#summary(rfagemodel)
-#plot(rfagemodel)
-
-```
-
-##Model accuracy: age from body length regression
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-md$rfagepred <- predict(rfagemodel)
-
-md <- md %>%
-  rownames_to_column(var="sample") %>%
-  left_join(select(sampleinfo, -predage), by="sample")
-
-
-accrf <- lm(predage~rfagepred, md)
-
-
-ggplot(md, aes(x=predage, y=rfagepred))+
-  geom_point(aes(colour=type))+
-  xlab("Age (weeks) from body length") +
-  ylab("Age (weeks) from marker gene expression (random forest model)")+
-  geom_smooth(method="lm", colour="black")+
-  theme_bw()+
- scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
-  geom_text_repel(aes(label=sample,colour=type), size=2.5)+
-  ggtitle("Using Marker gene expression to predict age", subtitle=paste("R^2 of correlation between measure from length and from gene expression:", round(summary(accrf)$r.squared, 3)))
-
-
-```
-
-
-##Model accuracy: cohort age data
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-  
-ggplot(md, aes(x=wkage, y=rfagepred))+
-  geom_point(aes(colour=type))+
-  xlab("Age (weeks): cohorts") +
-  ylab("Age (weeks) from marker gene expression (random forest model)")+
-  geom_smooth(method="lm", colour="black")+
-  theme_bw()+
- scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
-  geom_text_repel(aes(label=sample,colour=type), size=2.5)+
-  ggtitle("Using Marker gene expression to predict age", subtitle=paste("R^2 of correlation between actual age and predicted age based on gene expression with random forest model:", round(summary(lm(as.numeric(wkage)~rfagepred, md))$r.squared, 3)))
-
-
-
-
-save(rfagemodel, file="rfagemodel.rdata")
-
-```
-
-So we can use our marker set to very accurately predict a sample's age. 
-
-#Interrogating the model
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-summary(rfagemodel)
-print(rfagemodel)
-```
-

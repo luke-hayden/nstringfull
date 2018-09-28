@@ -171,7 +171,7 @@ sampleinfo <- left_join(sampleinfo, dplyr::select(preddf, sample, predage), by="
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
-save(sampleinfo,ctall.norm,ctallgood.norm, codeset,geneinf,ctall.unnorm, ctall.intonly , file="allns_data.rdata")
+save(sampleinfo,ctall.norm,ctallgood.norm, codeset,geneinf,ctall.unnorm, ctall.intonly ,minf, file="allns_data.rdata")
 
 
 ```
