@@ -1,0 +1,152 @@
+---
+title: "Gradient boosting"
+output: html_document
+---
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+#Set-up and data import
+library(dplyr)
+library(ggbiplot)
+library(tibble)
+library(tidyr)
+library(caret)
+library(RColorBrewer)
+library(ggrepel)
+library(gtools)
+library(FinCal)
+````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+#setwd("~/Documents/nstringjul18")
+load(file="allns_data.rdata")
+
+
+````
+
+
+```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+                 sampleinfo$ctg>2 &
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")
+&   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))
+))
+md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
+
+#md <- md[,colnames(md) %in% currbest$coefnames]
+
+
+
+
+
+md$sample <- rownames(md)
+
+md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
+  filter(!(is.na(predage))) %>%
+  column_to_rownames(var="sample")
+
+
+trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
+
+
+trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+trdat <- md[trainchoice,]
+tedat <- md[-trainchoice,]
+
+
+gbmagemodel <- train(
+  predage~.,
+  tuneLength = 4,
+#  metric="RMSE",
+#  importance = "permutation",
+  data = trdat, 
+  method = "gbm",
+  tuneGrid=expand.grid(n.trees = (0:200)*50, 
+                       interaction.depth = c(1,2,3), 
+                       shrinkage = .001, 
+                       n.minobsinnode = c(2,4,6)),
+  trControl =  trainControl(method = 'cv', 
+                            number = 5, 
+                            summaryFunction=defaultSummary, 
+                            verboseIter = T)
+)
+```
+
+
+
+
+
+```{r gbm plot, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+plot(gbmagemodel)
+#summary(currbest$finalModel)
+````
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+mymodel <- gbmagemodel
+
+
+#mymodel <- rfagemodel
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"& 
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+
+md$rfagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample")
+
+md <- subset(md, !(is.na(md$predage)))
+
+
+RMSEtr <- sqrt(mean( (md$rfagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+
+
+
+
+
+RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+(p=ggplot(md, aes(x=predage, y=rfagepred,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression (random forest model)")+
+  geom_smooth(method="lm", colour="black")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age: GBM", 
+          subtitle=paste0("RMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3))))#+  facet_wrap(~intrain)
+
+
+```
+
+

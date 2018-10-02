@@ -46,8 +46,9 @@ min.node.size: sets depth of trees
 
 cross-validation folds: number of repartitions of data for testing 
 
-The last of these has had by far the most importance in dealing with overfitting. Using most (47) of the 61 markers from the 2nd codeset, we get this model:
+splitting model: variance or "extratrees"
 
+This is how they affect the model, below. Note: lower RMSE is better. 
 
 
 
@@ -106,10 +107,15 @@ The last of these has had by far the most importance in dealing with overfitting
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
+plot(currbest)
 #rfagemodel$trainingData
 #summary(currbest$finalModel)
 ````
+
+
+The last of these has had by far the most importance in dealing with overfitting. Using most (47) of the 61 markers from the 2nd codeset, we get the followign model.
+
+
 
 ##Model accuracy: age from body length regression
 
@@ -196,7 +202,7 @@ Which looks to be a pretty major improvement in terms of dealing with the overfi
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-save(currbest,file="models.rdata")
+#save(currbest,file="models.rdata")
 
 ```
 
