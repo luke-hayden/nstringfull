@@ -109,34 +109,37 @@ ct1015.unnorm$rowname <- NULL
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
+
+
 setwd("~/nstringn17/ctg5and6")
 ct5and6.raw <- read.markup.RCC()
 
 
 setwd("~/nstringn17/ctg5hi")
 ct5and6hi.raw <- read.markup.RCC()
-
-
+ 
 setwd("~/nstringn17/ctg7and8")
 ct7and8.raw <- read.markup.RCC()
 
 
-setwd("~/nstringn17/ctg7and8hi")
-ct7and8hi.raw <- read.markup.RCC()
+# setwd("~/nstringn17/ctg7and8hi")
+# ct7and8hi.raw <- read.markup.RCC()
 
 setwd("~/nstringn17/ctg3and4")
 
 ct3and4.raw <- read.markup.RCC()
 
+# 
+# setwd("~/nstringn17/ctg1and2")
+# 
+# ct1and2.raw <- read.markup.RCC()
+# 
+# 
+# setwd("~/nstringn17/ctg9")
+# 
+# ct9.raw <- read.markup.RCC()
+# 
 
-setwd("~/nstringn17/ctg1and2")
-
-ct1and2.raw <- read.markup.RCC()
-
-
-setwd("~/nstringn17/ctg9")
-
-ct9.raw <- read.markup.RCC()
 
 
 
@@ -146,14 +149,11 @@ ct9.raw <- read.markup.RCC()
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-hknames <- rownames(ctg1011.matr)[210:214]
 
 
 t <- ct1011.raw
 t$x$CodeClass <- "Endogenous"
 ctg1011.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
-
-
 hknames <- rownames(ctg1011.matr)[210:214]
 ctg1011.hk <- subset(ctg1011.matr, rownames(ctg1011.matr) %in% hknames)
 

@@ -42,7 +42,7 @@ Model built previously: random forest using all 50 markers
 
 md <- as.data.frame(subset(t(ctall.norm), 
                            (sampleinfo$sex == "F" &
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") & 
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY", "regen") & 
                 sampleinfo$codeset == "phaw_1" &
                   sampleinfo$qual != "bad"&
                   sampleinfo$over10reads >40 &
@@ -53,7 +53,9 @@ md <- as.data.frame(subset(t(ctall.norm),
 
 
 
-mymodel <- rfagemodel
+mymodel <- currbest
+
+mymodel <- gbmagemodel
 md <- md[, colnames(md) %in% mymodel$coefnames]
 
 
@@ -109,6 +111,57 @@ tt <-t.test(md$lmresid[md$reg =="R"] , alternative="less" )
 #ggsave(plot=p, file="rejuvdet.pdf")
 ```
 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctall.norm), 
+                           (sampleinfo$sex == "F" &
+                 sampleinfo$exp %in% c("regen") & 
+ #               sampleinfo$codeset == "phaw_1" &
+                  sampleinfo$ctg > 5 &
+                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")
+ #|    sampleinfo$type == "OR-A"
+ )))
+
+
+
+mymodel <- currbest
+md <- md[, colnames(md) %in% mymodel$coefnames]
+
+
+
+md$rfagepred <- predict(mymodel, newdata= md)
+
+
+
+md$sample <- rownames(md)
+
+md <- left_join(md, sampleinfo, by="sample")# %>%  filter(!(is.na(predage)))
+
+
+md$group <- substr(md$sample, 1,1)
+md$ty <- substr(md$sample, 2,3)
+
+
+
+md2 <- select(md, rfagepred, group, ty)
+
+
+  
+md2 <-  spread(md2, value=rfagepred,key=ty)
+
+md2$dir <- md2$un > md2$re
+md2$diff <-  md2$re- md2$un
+
+ggplot(md2, aes(x=group, y=diff, fill=dir)) +geom_bar(stat="identity")
+
+
+t.test(md2$un, md2$re)
+
+
+````
+
+
 There may be an overall trend! Lets look at this in more detail
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
@@ -159,13 +212,18 @@ It's significant!
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-md <- as.data.frame(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
                  sampleinfo$exp %in% c("regen") & 
 #                 sampleinfo$type %in% c("O", "OR", "OR-A", "YR", "MR" )& 
   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
 
 
-md$rfagepred <- predict(rfagemodel, newdata= md)
+
+mymodel <- currbest
+md <- md[, colnames(md) %in% mymodel$coefnames]
+
+
+md$rfagepred <- predict(mymodel, newdata= md)
 
 
 md$sample <- rownames(md)
@@ -177,9 +235,9 @@ md <- left_join(md, sampleinfo, by="sample") %>%
 
 ggplot(md, aes(y=pair, x=rfagepred))+
   geom_point(aes(colour=over10reads))+
-  xlab("Age (weeks) from body length") +
-  ylab("Age (weeks) from marker gene expression (random forest model)")+
-  scale_colour_gradient(low="red2", high="forest green")+
+  xlab("pair") +
+  xlab("Age (weeks) from marker gene expression (random forest model)")+
+  scale_colour_gradient2(low="red2",mid="yellow",midpoint=70, high="forest green")+
   theme_bw()+
 # scale_colour_manual(values=c("darkviolet", "cornflower blue", "forest green", "red3"))+
   geom_text_repel(aes(label=sample,colour=over10reads), size=2.5)+

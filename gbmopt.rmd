@@ -28,8 +28,11 @@ library(FinCal)
 load(file="allns_data.rdata")
 
 
-````
+#save(cvdf,lmdf, lmdf2,  file="vardat.rdata")
+load(file="vardat.rdata")
+load(file="models.rdata")
 
+````
 
 ```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
@@ -74,9 +77,9 @@ gbmagemodel <- train(
   tuneGrid=expand.grid(n.trees = (0:200)*50, 
                        interaction.depth = c(1,2,3), 
                        shrinkage = .001, 
-                       n.minobsinnode = c(2,4,6)),
+                       n.minobsinnode = c(5,6,7)),
   trControl =  trainControl(method = 'cv', 
-                            number = 5, 
+                            number = 7, 
                             summaryFunction=defaultSummary, 
                             verboseIter = T)
 )

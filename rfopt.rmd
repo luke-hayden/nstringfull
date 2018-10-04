@@ -56,51 +56,51 @@ This is how they affect the model, below. Note: lower RMSE is better.
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 #Random forest
-# md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
-# 
-#                  sampleinfo$prep== "Luke"&
-#                  sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
-#                  sampleinfo$ctg>2 &
-#                 sampleinfo$codeset == "phaw_1" &
-#                  sampleinfo$type %in% c("O", "Y", "M")
-# &   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))
-# ))
-# md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
-# 
-# #md <- md[,colnames(md) %in% currbest$coefnames]
-# 
-# 
-# 
-# 
-# 
-# md$sample <- rownames(md)
-# 
-# md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
-#   filter(!(is.na(predage))) %>%
-#   column_to_rownames(var="sample")
-# 
-# 
-# trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
-# 
-# 
-# trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
-# trdat <- md[trainchoice,]
-# tedat <- md[-trainchoice,]
-# 
-# 
-# 
-# rfagemodel <- train(
-#   predage~.,
-#   tuneLength = 4,
-#   metric="RMSE",
-#   num.trees=2000,
-#   importance = "permutation",
-#   data = trdat, method = "ranger",
-#   tuneGrid=expand.grid(mtry=c(10:20),
-#                         splitrule=c("extratrees", "variance"),
-#                         min.node.size=c(1:10)),
-#   trControl = trainControl(method = "cv", number = 40, verboseIter = T)
-# )
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+                 sampleinfo$ctg>2 &
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")
+&   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))
+))
+md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
+
+#md <- md[,colnames(md) %in% currbest$coefnames]
+
+
+
+
+
+md$sample <- rownames(md)
+
+md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
+  filter(!(is.na(predage))) %>%
+  column_to_rownames(var="sample")
+
+
+trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
+
+
+trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+trdat <- md[trainchoice,]
+tedat <- md[-trainchoice,]
+
+
+
+rfagemodel <- train(
+  predage~.,
+  tuneLength = 4,
+  metric="RMSE",
+  num.trees=2000,
+  importance = "permutation",
+  data = trdat, method = "ranger",
+  tuneGrid=expand.grid(mtry=c(10:20),
+                        splitrule=c("extratrees", "variance"),
+                        min.node.size=c(1:10)),
+  trControl = trainControl(method = "cv", number = 1, verboseIter = T)
+)
 ```
 
 
