@@ -10,7 +10,6 @@ output: html_document
 
 #Set-up and data import
 library(dplyr)
-library(ggbiplot)
 library(tibble)
 library(tidyr)
 library(caret)
@@ -26,13 +25,12 @@ library(FinCal)
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 #setwd("~/Documents/nstringjul18")
 load(file="allns_data.rdata")
-
-
-#save(cvdf,lmdf, lmdf2,  file="vardat.rdata")
-load(file="vardat.rdata")
-load(file="models.rdata")
-
+load("modelgbm.rdata")
+load("models.rdata")
+load("vardat.rdata")
+load(file="markerchoiceinfo.rdata")
 ````
+
 
 ```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
@@ -40,17 +38,11 @@ md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
                  sampleinfo$prep== "Luke"&
                  sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
                  sampleinfo$ctg>2 &
-                sampleinfo$codeset == "phaw_1" &
                  sampleinfo$type %in% c("O", "Y", "M")
 &   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))
 ))
-md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
 
-#md <- md[,colnames(md) %in% currbest$coefnames]
-
-
-
-
+md <- md[, colnames(md) %in% c(minf$name[minf$chosen==T], "predage")]
 
 md$sample <- rownames(md)
 
@@ -62,7 +54,7 @@ md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
 trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
 
 
-trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+#trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
 trdat <- md[trainchoice,]
 tedat <- md[-trainchoice,]
 
@@ -70,16 +62,14 @@ tedat <- md[-trainchoice,]
 gbmagemodel <- train(
   predage~.,
   tuneLength = 4,
-#  metric="RMSE",
-#  importance = "permutation",
   data = trdat, 
   method = "gbm",
-  tuneGrid=expand.grid(n.trees = (0:200)*50, 
-                       interaction.depth = c(1,2,3), 
-                       shrinkage = .001, 
-                       n.minobsinnode = c(5,6,7)),
+  tuneGrid=expand.grid(n.trees = (0:50)*100, 
+                       interaction.depth = c(1,2,3,4,5), 
+                       shrinkage = c(0.0001,.001, 0.01, 0.1) ,
+                       n.minobsinnode = c(2,3,4,5,6,7)),
   trControl =  trainControl(method = 'cv', 
-                            number = 7, 
+                            number = 5, 
                             summaryFunction=defaultSummary, 
                             verboseIter = T)
 )
@@ -115,7 +105,7 @@ md <- md[,colnames(md) %in% mymodel$coefnames]
 
 
 
-md$rfagepred <- predict(mymodel, newdata=md)
+md$gbmagepred <- predict(mymodel, newdata=md)
 
 
 md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
@@ -129,18 +119,18 @@ md <- md %>%
 md <- subset(md, !(is.na(md$predage)))
 
 
-RMSEtr <- sqrt(mean( (md$rfagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+RMSEtr <- sqrt(mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
 
 
 
 
 
-RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
 
-(p=ggplot(md, aes(x=predage, y=rfagepred,colour=intrain))+
+(p=ggplot(md, aes(x=predage, y=gbmagepred,colour=intrain))+
   geom_point()+
   xlab("Age (weeks) from body length") +
-  ylab("Age (weeks) from marker gene expression (random forest model)")+
+  ylab("Age (weeks) from marker gene expression (GBM)")+
   geom_smooth(method="lm", colour="black")+
   theme_bw()+
  scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
