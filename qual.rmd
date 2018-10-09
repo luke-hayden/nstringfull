@@ -50,6 +50,21 @@ ggsave(plot=p, filename = "qual.pdf", device="pdf", height=40, width=6, limitsiz
 ````
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+hkdat <- as.data.frame(t(ctall.hk))
+
+nhkdat <- t(ctall.hk/rowMeans(ctall.hk))
+
+
+
+
+hkdat$over1 <- rowSums(hkdat>0)
+hkdat$over3 <- rowSums(t(ctall.hk)>3)
+
+hkdat$over5 <- rowSums(t(ctall.hk)>5)
+
+
+hkdat$over10 <- rowSums(t(ctall.hk)>10)
+
 
 
 ````
@@ -57,7 +72,7 @@ ggsave(plot=p, filename = "qual.pdf", device="pdf", height=40, width=6, limitsiz
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
+save(hkdat, file="hkdat.rdata")
 
 ````
 

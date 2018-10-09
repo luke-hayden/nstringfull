@@ -42,7 +42,7 @@ md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 &   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))
 ))
 
-md <- md[, colnames(md) %in% c(minf$name[minf$chosen==T], "predage")]
+md <- md[, colnames(md) %in% c(minf$name[minf$in61==T], "predage")]
 
 md$sample <- rownames(md)
 
