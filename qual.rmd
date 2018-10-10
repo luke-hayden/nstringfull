@@ -65,7 +65,7 @@ hkdat$over5 <- rowSums(t(ctall.hk)>5)
 
 hkdat$over10 <- rowSums(t(ctall.hk)>10)
 
-
+hkdat$sample <- rownames(hkdat)
 
 ````
 
