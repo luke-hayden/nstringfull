@@ -17,15 +17,18 @@ library(ggrepel)
 library(gtools)
 library(FinCal)
 library(ggrepel)
+library(e10)
 ````
 
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-setwd("~/Documents/nstringjul18/nstringfull")
+#setwd("~/Documents/nstringjul18/nstringfull")
 load(file="allns_data.rdata")
 load(file="models.rdata")
 
+load(file="modelgbm.rdata")
+load(file="hkdat.rdata")
 
 ````
 
@@ -55,7 +58,7 @@ md <- as.data.frame(subset(t(ctall.norm),
 
 mymodel <- currbest
 
-mymodel <- gbmagemodel
+mymodel <- currbestgbm
 md <- md[, colnames(md) %in% mymodel$coefnames]
 
 
@@ -110,7 +113,7 @@ tt <-t.test(md$lmresid[md$reg =="R"] , alternative="less" )
 
 #ggsave(plot=p, file="rejuvdet.pdf")
 ```
-
+#Does regeneration rejuvenate?
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
@@ -125,7 +128,7 @@ md <- as.data.frame(subset(t(ctall.norm),
 
 
 
-mymodel <- currbest
+mymodel <- currbestgbm
 md <- md[, colnames(md) %in% mymodel$coefnames]
 
 
@@ -136,27 +139,56 @@ md$rfagepred <- predict(mymodel, newdata= md)
 
 md$sample <- rownames(md)
 
-md <- left_join(md, sampleinfo, by="sample")# %>%  filter(!(is.na(predage)))
+md <- left_join(md, sampleinfo, by="sample") %>%
+  left_join(hkdat, by="sample") 
+
+
+
 
 
 md$group <- substr(md$sample, 1,1)
 md$ty <- substr(md$sample, 2,3)
 
+mdhk <-    select(md, over3, group, ty ) %>%
+  spread(value= over3, key=ty)
+
+colnames(mdhk)[2:4] <- paste0(colnames(mdhk)[2:4], "over")
 
 
-md2 <- select(md, rfagepred, group, ty)
+md2 <- select(md, rfagepred, group, ty) %>%
+  spread(value=rfagepred,key=ty) %>%
+  left_join(mdhk, by= "group")
 
 
-  
-md2 <-  spread(md2, value=rfagepred,key=ty)
+md2$control <- md2$un
+md2$control[md2$beover > md2$unover & !is.na(md2$beover)] <- md2$be[md2$beover > md2$unover & !is.na(md2$beover)]
+
 
 md2$dir <- md2$un > md2$re
 md2$diff <-  md2$re- md2$un
 
-ggplot(md2, aes(x=group, y=diff, fill=dir)) +geom_bar(stat="identity")
 
 
-t.test(md2$un, md2$re)
+ #left_join(hkdat, sampleinfo, by="sample") %>%
+ thresh <- 4
+
+
+md2$good <-  md2$unover >=thresh & md2$reover >=thresh
+
+
+ggplot(subset(md2, md2$good), aes(x=group, y=diff, fill=dir)) +
+  theme_bw()+
+  ylab("Rejuvenation Effect (weeks age difference)")+
+  xlab("Sample Group")+
+  geom_bar(stat="identity") +
+  scale_fill_manual(name="", 
+                    values=c("orangered", "forest green"), 
+                    labels=c("Aged", "Rejuvenated"))+
+  ggtitle("Rejuvenation Effect", 
+          subtitle= paste0("Samples with at least ", thresh, " housekeeping genes expressed in both  \np-value of t-test between regenerated and unamputated: ", 
+round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3))) 
+
+
 
 
 ````

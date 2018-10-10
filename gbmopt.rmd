@@ -85,10 +85,10 @@ plot(gbmagemodel)
 ````
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-mymodel <- gbmagemodel
+#mymodel <- gbmagemodel
 
 
-#mymodel <- rfagemodel
+mymodel <- currbestgbm
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"& 
@@ -142,4 +142,79 @@ RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == 
 
 ```
 
+####Variable importance
+
+Variable importance obtained via permutation 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+vrimp <- summary(mymodel)
+
+
+vrimp$sname <- substr(vrimp$var,1,2)
+vrimp$sname <- factor(vrimp$sname, levels=vrimp$sname[order(vrimp$rel.inf, decreasing=T)])
+
+(p=ggplot(vrimp, aes(x=sname, y=rel.inf))+
+  theme_bw()+
+  geom_bar(stat="identity", fill="red3")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  xlab("Marker")+
+  ylab("Contribution to model")+
+  ggtitle("Marker contributions", subtitle= paste0("GBM model built with ", length(mymodel$coefnames), " markers"))
+)
+
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.height = 20}
+
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"& 
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+md <- subset(md, rownames(md) %in% sampleinfo$sample[!is.na(sampleinfo$predage)])
+
+md <-  as.data.frame(md/rowMeans(md))
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample") %>%
+  gather(key=marker, value= exp, mymodel$coefnames)%>%
+  left_join(minf, by=c("marker"="name"))%>%
+  left_join(select(vrimp, -sname), by= c("marker"="var"))
+
+md$lab <- paste0(md$sname, ": ", round(md$rel.inf,3))
+
+
+md$lab <- factor(md$lab, levels=unique(md$lab[order(md$rel.inf, decreasing=T)]))
+
+(p=ggplot(md, aes(x=predage, y= exp, colour=dir))+
+  geom_smooth()+
+  geom_point(size=0.5)+
+  theme_bw()+
+  facet_wrap(~lab, scales="free", ncol=3)+
+  scale_colour_brewer(palette="Set1")+
+  xlab("Age (based on body length)")+
+  ylab("Normalised expression")+
+  theme(legend.direction = 'horizontal', legend.position = 'bottom')+
+ 
+  ggtitle("Marker profiles", subtitle= paste0("markers from random forest model built with ", length(mymodel$coefnames), " markers")) )
+
+
+
+
+
+ggsave(plot=p,height=18,width=6,dpi=200, filename=paste("gbmcontribprofiles.pdf"), useDingbats=FALSE, limitsize = FALSE)
+
+
+```
 

@@ -70,6 +70,18 @@ md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
 #md <- md[,colnames(md) %in% currbest$coefnames]
 
 
+md <- as.data.frame(subset(t(ctall.norm), sik$sex == "F" &
+
+                 sik$prep== "Luke"&
+                 sik$exp %in% c("Size-age", "cohorts", "OvY") &
+                 sik$ctg>2 &
+                sik$codeset == "phaw_1" &
+                 sik$type %in% c("O", "Y", "M")&   
+                  sik$good
+))
+
+md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
+
 
 
 
@@ -83,7 +95,7 @@ md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
 trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
 
 
-trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+#trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
 trdat <- md[trainchoice,]
 tedat <- md[-trainchoice,]
 
@@ -99,7 +111,7 @@ rfagemodel <- train(
   tuneGrid=expand.grid(mtry=c(10:20),
                         splitrule=c("extratrees", "variance"),
                         min.node.size=c(1:10)),
-  trControl = trainControl(method = "cv", number = 1, verboseIter = T)
+  trControl = trainControl(method = "cv", number = 40, verboseIter = T)
 )
 ```
 
@@ -107,7 +119,7 @@ rfagemodel <- train(
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-plot(currbest)
+plot(rfagemodel)
 #rfagemodel$trainingData
 #summary(currbest$finalModel)
 ````
@@ -175,7 +187,7 @@ RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F
                           "\nRMSE in test data: ", round(RMSEte,3))))#+  facet_wrap(~intrain)
 
 
-ggsave(plot=p,height=5,width=6,dpi=200, filename=paste("modeltrte.pdf"), useDingbats=FALSE, limitsize = FALSE)
+#ggsave(plot=p,height=5,width=6,dpi=200, filename=paste("modeltrte.pdf"), useDingbats=FALSE, limitsize = FALSE)
 
 
 ```
