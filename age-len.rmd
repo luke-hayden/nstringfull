@@ -43,7 +43,7 @@ powerTransform <- function(y, lambda1, lambda2 = NULL, method = "boxcox") {
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-setwd("~/Documents/nstringjul18")
+#setwd("~/Documents/nstringjul18")
 load(file="allns_data.rdata")
 zklen <- read.csv("zk-age-len.csv")[2:3] %>%
   mutate(prep="ZK")
@@ -117,37 +117,118 @@ lena$bcresid <- lena$wkage -lena$bcpred
 
 ```
 
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+polymod2 <- lm(wkage~poly(length,2), data=lena)
+
+lena$polypred2 <- predict(polymod2)
+
+lena$polyresid2 <- lena$wkage -lena$polypred2
+````
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+polymod3 <- lm(wkage~poly(length,3), data=lena)
+
+lena$polypred3 <- predict(polymod3)
+
+lena$polyresid3 <- lena$wkage -lena$polypred3
+````
+
+
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-mlena <- gather(lena, key="model", value="pred", c("bcpred", "linpred"))
+mlena <- gather(lena, key="model", value="pred", c("bcpred", "linpred", "polypred2", "polypred3"))
+
+# 
+# ggplot(mlena, aes(x=pred, y=length, colour=model))+
+#   geom_smooth(aes(y=length, x=wkage), colour="orange")+
+#   geom_line(size=1, alpha=0.6) +
+#   theme_bw()+
+#   geom_point(aes(x=wkage), colour="black")+
+#   scale_colour_brewer(palette="Set1", labels= c("linear model" ,
+#                  "Box-cox transformed linear model", 
+#                  "2rd-degree polynomial",
+#                  "3rd-degree polynomial")
+#                         )+
+#   xlab("Age (weeks)")+
+#   ylab("Body length (mm)")+
+#   ggtitle(label= "Linear regression age vs length", 
+#           subtitle=paste0("linear model R-squared: ", round(summary(m)$r.squared, 3), 
+#                  "\nBox-cox transformed linear model R-squared: ", round(summary(mnew)$r.squared, 3), 
+#                  "\n2rd-degree polynomial R-squared: ", round(summary(polymod2)$r.squared, 2),
+#                  "\n3rd-degree polynomial R-squared: ", round(summary(polymod3)$r.squared, 3)))
+  
+mlena$model <- factor(mlena$model, levels= c( "linpred", "bcpred","polypred2", "polypred3"))
+
+
+variable_labeller <- function(variable,value){
+  return(variable_names[value])
+}
+
+
+variable_names <- list( "linpred"=                   paste("linear model\n R-squared: ", round(summary(m)$r.squared, 3)), 
+ "bcpred"=                 paste("Box-cox transformed linear model\n R-squared: ", round(summary(mnew)$r.squared, 3)), 
+  "polypred2"=                paste("2rd-degree polynomial\n R-squared: ", round(summary(polymod2)$r.squared, 2)),
+    "polypred3" =              paste("3rd-degree polynomial\n R-squared: ", round(summary(polymod3)$r.squared, 3))
+                                     )
+
+
+
 
 
 ggplot(mlena, aes(x=pred, y=length, colour=model))+
-  geom_smooth(aes(y=length, x=wkage), colour="forest green")+
-  geom_line(size=1.5) +
+  geom_smooth(aes(y=length, x=wkage), colour="orange")+
+  geom_line(size=1, alpha=0.6) +
   theme_bw()+
+  facet_wrap(~model, labeller=variable_labeller)+
   geom_point(aes(x=wkage), colour="black")+
-  scale_colour_brewer(palette="Set1")+
+  scale_colour_brewer(palette="Set1", guide=F)+
   xlab("Age (weeks)")+
   ylab("Body length (mm)")+
-  ggtitle(label= "Linear regression age vs length", 
-          subtitle=paste0("linear model R-squared: ", round(summary(m)$r.squared, 3), 
-                 "\nBox-cox transformed linear model R-squared: ", round(summary(mnew)$r.squared, 3)))#+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Model", labels=c("Box-cox transformed", "Linear untransformed"))
+  ggtitle("Age vs length models", subtitle= 
+            "Models compared with LOESS (orange)")
   
-
+  
+  
 ```
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
-mlena <- gather(lena, key="model", value="resid", c("bcresid", "linresid"))
+mlena <- gather(lena, key="model", value="resid", c("bcresid", "linresid", "polyresid2", "polyresid3"))
 
-ggplot(mlena, aes(y=resid, x=length, colour=model))+
-  geom_point()+
-  scale_colour_brewer(palette="Set1")+
+
+
+mlena$model <- factor(mlena$model, levels= c( "linresid", "bcresid","polyresid2", "polyresid3"))
+
+
+variable_labeller <- function(variable,value){
+  return(variable_names[value])
+}
+
+
+variable_names <- list( "linresid"=                   paste("linear model\n R-squared: ", round(summary(m)$r.squared, 3)), 
+ "bcresid"=                 paste("Box-cox transformed linear model\n R-squared: ", round(summary(mnew)$r.squared, 3)), 
+  "polyresid2"=                paste("2rd-degree polynomial\n R-squared: ", round(summary(polymod2)$r.squared, 2)),
+    "polyresid3" =              paste("3rd-degree polynomial\n R-squared: ", round(summary(polymod3)$r.squared, 3))
+                                     )
+
+
+ggplot(mlena, aes(y=resid, x=length, fill=model, colour=model))+
+  geom_bar(stat="identity")+
+#  geom_point()+
+  scale_colour_brewer(palette="Set1",guide=F)+
+  scale_fill_brewer(palette="Set1", labels= c("linear model" ,
+                 "Box-cox transformed linear model", 
+                 "2rd-degree polynomial",
+                 "3rd-degree polynomial")
+                        )+
   theme_bw()+
-  facet_wrap(~model)
+  xlab("Residual Age (weeks)")+
+  ylab("Body length (mm)")+
+  facet_wrap(~model,labeller=variable_labeller)
 ````
 
 

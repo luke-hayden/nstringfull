@@ -293,15 +293,15 @@ mymodel$coefnames
 Variable importance obtained via permutation 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+mymodel <- currbest
 
-
-vrimp <-varImp(mymodel)$importance %>%
+vrimprf <-varImp(mymodel)$importance %>%
   rownames_to_column(var="name")
-vrimp$sname <- substr(vrimp$name, 1,2)
+vrimprf$sname <- substr(vrimprf$name, 1,2)
 
-vrimp$sname <- factor(vrimp$sname, levels=vrimp$sname[order(vrimp$Overall, decreasing=T)])
+vrimprf$sname <- factor(vrimprf$sname, levels=vrimprf$sname[order(vrimprf$Overall, decreasing=T)])
 
-(p=ggplot(vrimp, aes(x=sname, y=Overall))+
+(p=ggplot(vrimprf, aes(x=sname, y=Overall))+
   theme_bw()+
   geom_bar(stat="identity", fill="red3")+
   theme(axis.text.x = element_text(angle = 60, hjust = 1))+
@@ -345,7 +345,7 @@ md <- md %>%
   left_join(sampleinfo,  by="sample") %>%
   gather(key=marker, value= exp, mymodel$coefnames)%>%
   left_join(minf, by=c("marker"="name"))%>%
-  left_join(select(vrimp, -sname), by= c("marker"="name"))
+  left_join(select(vrimprf, -sname), by= c("marker"="name"))
 
 md$lab <- paste0(md$sname, ": ", round(md$Overall,3))
 

@@ -13,6 +13,7 @@ library(ggbiplot)
 library(tibble)
 library(tidyr)
 library(reshape2)
+library(matrixStats)
 ````
 
 
@@ -54,7 +55,7 @@ hkdat <- as.data.frame(t(ctall.hk))
 
 nhkdat <- t(ctall.hk/rowMeans(ctall.hk))
 
-
+meds <- colMedians(t(ctall.hk))
 
 
 hkdat$over1 <- rowSums(hkdat>0)
@@ -79,6 +80,32 @@ save(hkdat, file="hkdat.rdata")
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+md <- as.data.frame(t(subset(t(ctall.norm), 
+                 sampleinfo$prep == "Nikos" & 
+                 sampleinfo$ctg %in% 3:4&
+  !(sampleinfo$sample %in% c("O1a", "O1b", "YR1a", "YR1b" , "YR2a", "YR2b")))))
+
+
+si <- subset(sampleinfo, sampleinfo$sample %in% colnames(md))
+
+
+sl <- as.character(sampleinfo$sample[sampleinfo$sample %in% colnames(md)])
+
+md$marker <- rownames(md)
+
+mmd <- gather(as.data.frame(md), key="sample", value="expression", sl) 
+mmd$gp <- substr(mmd$sample, 1, nchar(mmd$sample)-1)
+
+mmd$rep <- substr(mmd$sample,  nchar(mmd$sample), nchar(mmd$sample))
+
+
+md <- select(mmd, -sample)
+
+md2 <- select(md, rfagepred, group, ty) %>%
+  spread(value=rfagepred,key=ty) %>%
+  left_join(mdhk, by= "group")
 
 
 ````

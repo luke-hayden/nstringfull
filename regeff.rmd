@@ -30,6 +30,9 @@ load(file="models.rdata")
 load(file="modelgbm.rdata")
 load(file="hkdat.rdata")
 
+
+sik <- left_join(sampleinfo, hkdat, by="sample")
+
 ````
 
 
@@ -44,19 +47,15 @@ Model built previously: random forest using all 50 markers
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 md <- as.data.frame(subset(t(ctall.norm), 
-                           (sampleinfo$sex == "F" &
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY", "regen") & 
-                sampleinfo$codeset == "phaw_1" &
-                  sampleinfo$qual != "bad"&
-                  sampleinfo$over10reads >40 &
-                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD","Areg", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))) 
- #|    sampleinfo$type == "OR-A"
- ))
+                           (sik$sex == "F" &
+                              sik$over3 >= thresh&
+                 sik$exp %in% c("Size-age", "cohorts", "OvY", "regen") & 
+                 sik$type %in% c("O", "Y", "M", "OR", "MR", "YR")
+)) 
+ #|    sik$type == "OR-A"
+ )
 
 
-
-mymodel <- currbest
 
 mymodel <- currbestgbm
 md <- md[, colnames(md) %in% mymodel$coefnames]
@@ -93,8 +92,6 @@ md$lmressign <- md$lmresid >0
 md$regen <- ifelse(md$reg =="" , "unregenerated", "regenerated"         )
 
 
-tt <-t.test(md$lmresid[md$reg =="R"] , alternative="less" )
-
 
 
 
@@ -107,7 +104,7 @@ tt <-t.test(md$lmresid[md$reg =="R"] , alternative="less" )
   geom_smooth(method="lm", colour="black", data=subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") ))+
   theme_bw()+
  scale_colour_manual(values=c("forest green", "dark grey"), name="")+
-  geom_text_repel(aes(label=sample,colour=regen), size=2.5)+
+#  geom_text_repel(aes(label=sample,colour=regen), size=2.5)+
   ggtitle("How does regeneration affect molecular age?", 
           subtitle= paste0("one-sided t-test p-value on residuals of regenerated: ", round(tt$p.value,3))))
 
@@ -120,10 +117,8 @@ tt <-t.test(md$lmresid[md$reg =="R"] , alternative="less" )
 md <- as.data.frame(subset(t(ctall.norm), 
                            (sampleinfo$sex == "F" &
                  sampleinfo$exp %in% c("regen") & 
- #               sampleinfo$codeset == "phaw_1" &
                   sampleinfo$ctg > 5 &
                  sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")
- #|    sampleinfo$type == "OR-A"
  )))
 
 
@@ -166,7 +161,9 @@ md2$control[md2$beover > md2$unover & !is.na(md2$beover)] <- md2$be[md2$beover >
 
 md2$dir <- md2$un > md2$re
 md2$diff <-  md2$re- md2$un
+md2$regn <- paste0(md2$group, "reg")
 
+md2 <- left_join(md2, select(sampleinfo, sample, predage), by=c("regn"= "sample"))
 
 
  #left_join(hkdat, sampleinfo, by="sample") %>%
@@ -185,13 +182,78 @@ ggplot(subset(md2, md2$good), aes(x=group, y=diff, fill=dir)) +
                     values=c("orangered", "forest green"), 
                     labels=c("Aged", "Rejuvenated"))+
   ggtitle("Rejuvenation Effect", 
-          subtitle= paste0("Samples with at least ", thresh, " housekeeping genes expressed in both  \np-value of t-test between regenerated and unamputated: ", 
+          subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used", "\nSamples with at least ", thresh, " housekeeping genes expressed in both  \np-value of t-test between regenerated and unamputated: ", 
 round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3))) 
 
 
+ggplot(subset(md2, md2$good), aes(x=group,y=0, yend=diff, fill=dir)) +
+  theme_bw()+
+  ylab("Rejuvenation Effect (weeks age difference)")+
+  xlab("Sample Group")+
+  geom_segment(stat="identity") +
+  scale_fill_manual(name="", 
+                    values=c("orangered", "forest green"), 
+                    labels=c("Aged", "Rejuvenated"))+
+  ggtitle("Rejuvenation Effect", 
+          subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used", "\nSamples with at least ", thresh, " housekeeping genes expressed in both  \np-value of t-test between regenerated and unamputated: ", 
+round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3))) 
 
 
 ````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctall.norm), 
+                           (sik$sex == "F" &
+                              sik$over3 >= thresh&
+                 sik$exp %in% c("Size-age", "cohorts", "OvY", "regen") & 
+                 sik$type %in% c("O", "Y", "M", "OR", "MR", "YR")
+                 &                 !  sik$sample %in% c("AF", "AG")
+)) 
+ )
+
+
+
+mymodel <- currbestgbm
+md <- md[, colnames(md) %in% mymodel$coefnames]
+md$rfagepred <- predict(mymodel, newdata= md)
+
+md$sample <- rownames(md)
+
+md <- left_join(md, sik, by="sample") %>%
+  filter(!(is.na(predage)))
+
+lm <- lm(rfagepred~predage, data=md)
+ 
+reglist <- c(paste0(md2$group[md2$good], c("un")), paste0(md2$group[md2$good], c("reg")))
+
+
+(p=ggplot(md, aes(x=predage, y=rfagepred))+
+
+#  geom_text_repel(aes(label=sample), size=2.5)   + 
+  geom_point(colour="grey")+
+  xlab("Age (weeks) from body length") +
+  ylab(paste0("Age (weeks) from marker gene expression (", toupper(mymodel$method), ")"))+
+  geom_smooth(method="lm", colour="black", data=subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") ))+
+  theme_bw()+
+  geom_segment(data=subset(md2, md2$good), aes(x=predage, xend=predage, y=un, yend=re, colour=dir),alpha=1, size=1.5, 
+               arrow= arrow(length=unit(0.30,"cm"), ends="last", type = "open"))+
+ # geom_text_repel(data=subset(md, md$sample %in% reglist), aes(label=sample))+
+  scale_colour_manual(name="", 
+                    values=c("orangered", "forest green"), 
+                    labels=c("Aged", "Rejuvenated"))+
+  ggtitle("Change in molecular age due to regeneration", 
+          subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used", "\nSamples with at least ", thresh, " housekeeping genes expressed in both  \np-value of t-test between regenerated and unamputated: ", 
+round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3))) )
+
+
+ggsave(plot=p, file="rejuveff.pdf", height=8, width=8)
+```
+
+
 
 
 There may be an overall trend! Lets look at this in more detail
@@ -208,14 +270,6 @@ ggplot(md, aes(x=predage, y=rfagepred))+
   ggtitle("How does regeneration affect molecular age", subtitle= paste("model using 50 predictors (random forest)"))
 
 ```
-
-##Test the significance of this effect
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-t.test(md$lmresid[md$reg =="R"] , alternative="less" )
-  
-
-````
 
 
 
