@@ -14,13 +14,15 @@ library(tibble)
 library(tidyr)
 library(reshape2)
 library(matrixStats)
-````
+library(gtools)
+library(GGally)
+```
 
 
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-setwd("~/Documents/nstringjul18")
+#setwd("~/Documents/nstringjul18")
 load(file="allns_data.rdata")
 
 ````
@@ -101,11 +103,83 @@ mmd$gp <- substr(mmd$sample, 1, nchar(mmd$sample)-1)
 mmd$rep <- substr(mmd$sample,  nchar(mmd$sample), nchar(mmd$sample))
 
 
-md <- select(mmd, -sample)
+md <- select(mmd, -sample) 
 
-md2 <- select(md, rfagepred, group, ty) %>%
-  spread(value=rfagepred,key=ty) %>%
-  left_join(mdhk, by= "group")
+
+mmd2 <- left_join( select(dplyr::rename(filter(md, rep=="a"), expression_a =expression), -rep),
+                   select(dplyr::rename(filter(md, rep=="b"), expression_b =expression), -rep),
+                   by=c("marker", "gp") )
+
+
+ggplot(mmd2, aes(x=expression_a, y=expression_b))+
+  geom_point(alpha=0.1)+
+  geom_smooth(method="lm")+
+# geom_hex()+
+  theme_bw()+
+   scale_x_log10()+
+  scale_y_log10()
+
+
+ablm <- lm(expression_a~expression_b, data=mmd2)
+summary(ablm)
+
+mmd2$predexpa <- predict(ablm)
+mmd2$resid <- mmd2$expression_a -mmd2$predexpa
+
+
+mmd2$abfc <- foldchange2logratio(foldchange(mmd2$expression_a, mmd2$expression_b))
+mmd2$absabfc <- abs(mmd2$abfc)
+mmd2$normresid <- mmd2$resid/mmd2$expression_b
+
+ggplot(mmd2, aes(y=normresid, x=expression_b))+
+  geom_point(alpha=0.1)+
+  stat_smooth()+
+# geom_hex()+
+  theme_bw()+
+  scale_x_log10()
+
+
 
 
 ````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+mhk <- hkdat[, 1:5]
+mhk <- mhk[ , order(names(mhk))]
+cormat <- round(cor(mhk),2)
+
+
+#cormat[lower.tri(cormat)] <- NA
+
+mcm <- melt(cormat, na.rm = TRUE)
+#mcm$vcomb<- paste0(mcm$Var1, mcm$Var2)
+#mcm <- subset(mcm, duplicated(mcm$vcomb))
+
+
+
+ggplot(data = mcm, aes(Var1, Var2, fill = value, label=value))+
+ geom_tile(color = "white")+
+    geom_text(colour="black")+
+ scale_fill_gradient2(low = "red3", high = "cornflower blue", mid = "white", 
+   midpoint = 0.5, limit = c(0,1), space = "Lab", 
+   name="Pearson\nCorrelation") +
+  theme_minimal()+ 
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 12, hjust = 1))+
+ coord_fixed()+
+  xlab("")+
+  ylab("")+
+  ggtitle("Correlation between Housekeeping Genes")
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+ggpairs(mhk)+
+  theme_bw()
+
+```
