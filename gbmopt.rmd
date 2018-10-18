@@ -88,7 +88,7 @@ plot(gbmagemodel)
 #mymodel <- gbmagemodel
 
 
-mymodel <- currbestgbm
+mymodel <- currbest
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"& 
@@ -148,13 +148,15 @@ Variable importance obtained via permutation
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-vrimp <- summary(mymodel)
+
+mymodel <- currbestgbm
+vrimpgbm <- summary(mymodel)
 
 
-vrimp$sname <- substr(vrimp$var,1,2)
-vrimp$sname <- factor(vrimp$sname, levels=vrimp$sname[order(vrimp$rel.inf, decreasing=T)])
+vrimpgbm$sname <- substr(vrimpgbm$var,1,2)
+vrimpgbm$sname <- factor(vrimpgbm$sname, levels=vrimpgbm$sname[order(vrimpgbm$rel.inf, decreasing=T)])
 
-(p=ggplot(vrimp, aes(x=sname, y=rel.inf))+
+(p=ggplot(vrimpgbm, aes(x=sname, y=rel.inf))+
   theme_bw()+
   geom_bar(stat="identity", fill="red3")+
   theme(axis.text.x = element_text(angle = 60, hjust = 1))+
@@ -166,7 +168,7 @@ vrimp$sname <- factor(vrimp$sname, levels=vrimp$sname[order(vrimp$rel.inf, decre
 ````
 
 
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.height = 20}
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.height = 12}
 
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
@@ -190,7 +192,7 @@ md <- md %>%
   left_join(sampleinfo,  by="sample") %>%
   gather(key=marker, value= exp, mymodel$coefnames)%>%
   left_join(minf, by=c("marker"="name"))%>%
-  left_join(select(vrimp, -sname), by= c("marker"="var"))
+  left_join(select(vrimpgbm, -sname), by= c("marker"="var"))
 
 md$lab <- paste0(md$sname, ": ", round(md$rel.inf,3))
 
@@ -218,3 +220,25 @@ ggsave(plot=p,height=18,width=6,dpi=200, filename=paste("gbmcontribprofiles.pdf"
 
 ```
 
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+vrimp <- left_join(vrimpgbm, vrimprf, by="sname")
+
+ggplot(vrimp, aes(x=rel.inf,y=Overall, label=sname))+
+  theme_bw()+
+  ylab("Random Forest importance")+
+  xlab("GBM relative influence")+
+  scale_y_continuous(trans="log2")+
+  scale_x_continuous(trans="log2")+
+#  scale_y_log10()+
+#  scale_x_log10()+
+  geom_point(size=3, colour="red2")+
+  geom_text_repel()+
+  ggtitle("Marker importance: GBM vs Random Forest", subtitle= paste0("Same ", length(mymodel$coefnames), " markers"))
+
+
+````

@@ -24,7 +24,7 @@ library(GGally)
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 #setwd("~/Documents/nstringjul18")
 load(file="allns_data.rdata")
-
+load(file="sampleinfo.rdata")
 ````
 
 
@@ -40,15 +40,15 @@ mc <- left_join(mc, sampleinfo, by= "sample") %>%
 
 
 
-(p=ggplot(mc, aes(x=marker, y=expression, colour=over0reads)) +geom_point() +
-  facet_wrap(~ctgsamp, ncol=6)+
-    scale_y_log10()+
-    scale_colour_gradient(high="green", low="red2")+
-    theme_minimal()
-  )
-  
-ggsave(plot=p, filename = "qual.pdf", device="pdf", height=40, width=6, limitsize = F)
-  
+# (p=ggplot(mc, aes(x=marker, y=expression, colour=over0reads)) +geom_point() +
+#   facet_wrap(~ctgsamp, ncol=6)+
+#     scale_y_log10()+
+#     scale_colour_gradient(high="green", low="red2")+
+#     theme_minimal()
+#   )
+#   
+# ggsave(plot=p, filename = "qual.pdf", device="pdf", height=40, width=6, limitsize = F)
+#   
 
 ````
 
@@ -147,16 +147,32 @@ ggplot(mmd2, aes(y=normresid, x=expression_b))+
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+reorder_cormat <- function(cormat){
+# Use correlation between variables as distance
+dd <- as.dist((1-cormat)/2)
+hc <- hclust(dd)
+cormat <-cormat[hc$order, hc$order]
+}
+
+ get_lower_tri<-function(cormat){
+    cormat[upper.tri(cormat)] <- NA
+    return(cormat)
+  }
+  # Get upper triangle of the correlation matrix
+  get_upper_tri <- function(cormat){
+    cormat[lower.tri(cormat)]<- NA
+    return(cormat)
+  }
+  
+
 mhk <- hkdat[, 1:5]
 mhk <- mhk[ , order(names(mhk))]
-cormat <- round(cor(mhk),2)
-
-
-#cormat[lower.tri(cormat)] <- NA
+cormat <- round(cor(mhk),2)  
+  
+cormat <- reorder_cormat(cormat)
+upper_tri <- get_upper_tri(cormat)
 
 mcm <- melt(cormat, na.rm = TRUE)
-#mcm$vcomb<- paste0(mcm$Var1, mcm$Var2)
-#mcm <- subset(mcm, duplicated(mcm$vcomb))
 
 
 
@@ -174,6 +190,8 @@ ggplot(data = mcm, aes(Var1, Var2, fill = value, label=value))+
   ylab("")+
   ggtitle("Correlation between Housekeeping Genes")
 
+
+
 ````
 
 
@@ -182,4 +200,95 @@ ggplot(data = mcm, aes(Var1, Var2, fill = value, label=value))+
 ggpairs(mhk)+
   theme_bw()
 
+
+````
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+log <-   !(sampleinfo$sample %in% c("AG", "AI", "AB")) &
+  sampleinfo$flag == FALSE
+#log <- TRUE
+
+bcmin <- as.matrix(ctall.hk[,log==T])
+bcmin.groups <- sampleinfo$flag[log==T]
+tbc <- as.matrix(t(bcmin))
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=T, labels=rownames(tbc), groups=bc.groups)+ggtitle("PCA")+
+    theme_minimal() +
+  scale_colour_manual(values=c("cornflower blue", "red3", "black"))+
+  theme(plot.title=element_text(size=8,face="bold"))
+#  geom_label(label=rownames(tbc), aes(colour=bc.groups))+
+#  scale_colour_manual(values= c("darkviolet","cornflower blue",  "red2"))
+
+
 ```
+
+#Housekeeping genes to predict one another
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+log <-   !(sampleinfo$sample %in% c("AG", "AI", "AB")) &
+  sampleinfo$flag == FALSE
+#log <- TRUE
+
+mhk <- as.data.frame(t(ctall.hk[,log==T])) 
+
+colnames(mhk) <- substr(colnames(mhk),1,2)
+
+
+lmhl <- lm(HL~., data=mhk)
+lmeo <- lm(EO~., data=mhk)
+lmfq <- lm(FQ~., data=mhk)
+lmaq <- lm(AQ~., data=mhk)
+lmbs <- lm(BS~., data=mhk)
+
+mhk <-   rownames_to_column(mhk, var="sample")
+allhk <- as.data.frame(t(ctall.hk)) 
+
+colnames(allhk) <- substr(colnames(allhk),1,2)
+
+allhk <- rownames_to_column(allhk, var="sample")
+
+predf <- data.frame("HL"= predict(lmhl, newdata = allhk), 
+                    "EO"= predict(lmeo, newdata = allhk),
+                    "FQ"= predict(lmfq, newdata = allhk),
+                    "AQ"= predict(lmaq, newdata = allhk),
+                    "BS"= predict(lmbs, newdata = allhk), 
+                    "sample"= allhk$sample) 
+
+mpredf <- gather(predf, key= "hk", value="predexp", -sample)
+mmhk <- gather(mhk, key="hk", value="exp", -sample) %>%
+  left_join(mpredf, by=c("hk", "sample"))
+
+
+mallhk <- gather(allhk, key="hk", value="exp", -sample) %>%
+  left_join(mpredf, by=c("hk", "sample"))
+
+hkm <- data.frame(mean= colMeans(t(ctall.hk[,log==T])), hk=substr(colnames(t(ctall.hk[,log==T])),1,2))
+
+
+mmhk$resid <- mmhk$exp-mmhk$predexp
+
+mallhk$resid <- mallhk$exp-mmhk$predexp
+mallhk$flag <- mallhk$sample %in% sampleinfo$sample[  sampleinfo$flag == T]
+mallhk <- left_join(mallhk, hkm, by= "hk")
+mallhk$normresid <- mallhk$resid/mallhk$mean
+
+ggplot(mmhk, aes(x=exp, y=predexp))+geom_point()+
+  facet_wrap(~hk)+scale_y_log10()+
+  scale_x_log10()+theme_bw()
+
+
+ggplot(mallhk, aes(x=normresid, fill=flag))+
+  geom_density(alpha=0.5)+
+  theme_bw()+
+scale_fill_brewer(palette="Set1")+
+  facet_wrap(~hk)
+  xlim(-300, 300)
+
+````

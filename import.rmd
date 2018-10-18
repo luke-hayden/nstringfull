@@ -18,30 +18,37 @@ library(lubridate)
 
 
 
-
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-setwd("~/Documents/nstringjul18/1011")
-ct1011.raw <- read.markup.RCC()
 
-
-setwd("~/Documents/nstringjul18/1213")
-ct1213.raw <- read.markup.RCC()
-
-
-setwd("~/Documents/nstringjul18/14")
-ct14.raw <- read.markup.RCC()
-
-
-setwd("~/Documents/nstringjul18/15")
-ct15.raw <- read.markup.RCC()
-
+load(file="nov17main_data.rdata")
+load(file="markerchoiceinfo.rdata")
 
 ````
 
 
+#Normalised Fully
+
+
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+ctg1and2.norm <- NanoStringNorm(x = ct1and2.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg3and4.norm <- NanoStringNorm(x = ct3and4.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg5and6.norm <- NanoStringNorm(x = ct5and6.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg5and6hi.norm <- NanoStringNorm(x = ct5and6hi.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg7and8.norm <- NanoStringNorm(x = ct7and8.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg7and8hi.norm <- NanoStringNorm(x = ct7and8hi.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ctg9.norm <- NanoStringNorm(x = ct9.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
 
 ctg1011.norm <- NanoStringNorm(x = ct1011.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
 
@@ -82,7 +89,7 @@ ct1015.intonly$rowname <- NULL
 
 
 ```
-
+#Unnormalised
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
@@ -103,47 +110,7 @@ rownames(ct1015.unnorm) <- ct1015.unnorm$marker
 ct1015.unnorm$rowname <- NULL
 ```
 
-
-
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-
-setwd("~/nstringn17/ctg5and6")
-ct5and6.raw <- read.markup.RCC()
-
-
-setwd("~/nstringn17/ctg5hi")
-ct5and6hi.raw <- read.markup.RCC()
- 
-setwd("~/nstringn17/ctg7and8")
-ct7and8.raw <- read.markup.RCC()
-
-
-# setwd("~/nstringn17/ctg7and8hi")
-# ct7and8hi.raw <- read.markup.RCC()
-
-setwd("~/nstringn17/ctg3and4")
-
-ct3and4.raw <- read.markup.RCC()
-
-# 
-# setwd("~/nstringn17/ctg1and2")
-# 
-# ct1and2.raw <- read.markup.RCC()
-# 
-# 
-# setwd("~/nstringn17/ctg9")
-# 
-# ct9.raw <- read.markup.RCC()
-# 
-
-
-
-
-```
+#Housekeeping
 
 
 
@@ -203,15 +170,6 @@ ctg9.hk <- subset(ctg9.matr, rownames(ctg9.matr) %in% hknames)
 ````
 
 
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-load(file="nov17main_data.rdata")
-load(file="markerchoiceinfo.rdata")
-
-````
-
-
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
@@ -222,6 +180,7 @@ ctall.unnorm <- cbind(ctg1to9un, as.matrix(ct1015.unnorm))
 
 ctall.intonly <- cbind(ctg1to9intonly, as.matrix(ct1015.intonly))
 
+ctall.hk <- cbind(ctg1and2.hk, ctg3and4.hk, ctg5and6hi.hk, ctg7and8hi.hk, ctg9.hk, ctg1011.hk, ctg1213.hk, ctg14.hk, ctg15.hk)
 
 
 sampleinfo <- read.csv("siall.csv")
@@ -232,6 +191,7 @@ colnames(ctall.unnorm) <- sampleinfo$sample
 colnames(ctall.intonly) <- sampleinfo$sample
 
   
+colnames(ctall.hk) <- sampleinfo$sample
   
 log <-rownames(ctall.norm) %in% minf$name[minf$chosenand ==T]
 
@@ -268,47 +228,15 @@ sampleinfo <- left_join(sampleinfo, posdf, by= "key")
 
 
 
-save(sampleinfo,ctall.norm,ctallgood.norm, codeset,geneinf,ctall.unnorm, ctall.intonly , file="allns_data.rdata")
+save(ctall.norm,ctallgood.norm, codeset,geneinf,ctall.unnorm, ctall.intonly ,ctall.hk, file="allns_data.rdata")
 
-
-````
-
-
-
-
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-
-log <- sampleinfo$reg == "" & 
-  !(sampleinfo$age %in% c("N")) & 
-  sampleinfo$sex == "F"&
-  sampleinfo$exp %in% c("OvY", "Size-age") & 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8")) &
-#  sampleinfo$over10reads > 100 &
-  sampleinfo$ctg > 2 &
-  sampleinfo$prep == "Luke"
-
-bcmin <- as.matrix(ctallgood.norm[,log== TRUE])
-bcmin.groups <- subset(sampleinfo$type, log==TRUE)
-
-tbc <- as.matrix(t(bcmin))
-
-bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
-bc.groups <- bcmin.groups
-
-
-ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+ggtitle("PCA of Old vs Young (females)")+
-    theme_minimal() +
-#  scale_colour_manual(values=c("cornflower blue", "red3", "black"))+
-  theme(plot.title=element_text(size=8,face="bold"))+
-#  geom_label(label=rownames(tbc), aes(colour=bc.groups))+
-  scale_colour_manual(values= c("darkviolet","cornflower blue",  "red2"))
-
+save(sampleinfo , file="sampleinfo.rdata")
 
 ````
+
+
+
+
 
 
 
