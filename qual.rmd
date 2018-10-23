@@ -16,6 +16,8 @@ library(reshape2)
 library(matrixStats)
 library(gtools)
 library(GGally)
+library(philentropy)
+library(ggrepel)
 ```
 
 #Intro
@@ -141,7 +143,7 @@ And looking at the residual variation:
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 ablm <- lm(expression_a~expression_b, data=mmd2)
-summary(ablm)
+#summary(ablm)
 
 mmd2$predexpa <- predict(ablm)
 mmd2$resid <- mmd2$expression_a -mmd2$predexpa
@@ -180,6 +182,8 @@ To place this into context, we need to ask how strongly expressed our housekeepi
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
+
+mhk <- hkdat[, 1:5]
 
 hkexp <- melt(mhk[,1:5])
 
@@ -492,7 +496,7 @@ scale_fill_brewer(palette="Set1"))+
   ggtitle("Ranking deviation from observed/expected")#+  theme(axis.text.y = element_text(angle = 0, hjust =0, size=3)))
 #  scale_x_log10()
 
-
+chimhkall <-mhkall
 #ggsave(plot=p, filename = "chi.pdf", height=13, width=4)
 
 ````
@@ -500,12 +504,66 @@ scale_fill_brewer(palette="Set1"))+
 
 Here, we can simply add a cut-off on the basis of this Chi-statistic. Note that our previous "weird outliers" are thrown out by this measure. 
 
+#Jensen-Shannon Divergence 
+
+Compute the difference between two probability distributions. 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.height = 20}
+
+log <-    sampleinfo$flag == FALSE
+
+
+mhk <- as.data.frame(t(ctall.hk[,log==T])) 
+
+expected <- colSums(mhk)/sum(colSums(mhk))
+
+mhkall <-  as.data.frame(t(ctall.hk))
+mhkall <- mhkall/rowSums(mhkall)
+
+mhkall <- subset(mhkall, rowSums(mhkall) !=0)
+
+jsd.result <- list()
+
+for (i in 1:nrow(mhkall)){
+  q <- as.numeric(mhkall[i,])
+  p <- expected
+  
+  x <- rbind(p,q)
+  jsd.result[i] <- JSD(x)
+  
+}
+
+mhkall$jsdres <- unlist(jsd.result)
+mhkall$sample <- rownames(mhkall)
+mhkall <- left_join( select(mhkall, sample, jsdres), chimhkall, by="sample")
+
+mhkall$sample <- factor(mhkall$sample, levels=mhkall$sample[order(mhkall$jsdres)])
+(p=ggplot(mhkall, aes(y=jsdres,x=sample, fill=flag))+
+  geom_bar(stat="identity")+
+coord_flip()+
+  theme_bw()+
+  ylab("Jensen-Shannon Divergence")+
+scale_fill_brewer(palette="Set1"))+
+  ggtitle("Ranking deviation from observed/expected (JSD)")
+````
+
+The top few of these are also fairly poor samples that don't fit expected patterns
 
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
+ggplot(mhkall, aes(x=chistat,y=jsdres,colour=flag, label=sample))+
+  geom_point()+
+ geom_text_repel(size=1)+
+  theme_bw()+
+scale_colour_brewer(palette="Set1", name="Sample flagged?")+
+  xlab("Chi-stat (proportional expression of housekeeping genes)")+
+  ylab("Jensen-Shannon Divergence")+
+  scale_x_log10()+
+  scale_y_log10()+
+  ggtitle("Deviation from observed/expected: JSD vs Chi-square")
 ````
 
 
