@@ -161,19 +161,127 @@ mmd2$absnormresid <- abs(mmd2$normresid)
 ggplot(mmd2, aes(y=absnormresid, x=expression_b))+
   geom_point(alpha=0.1, colour="red2")+
   stat_smooth()+
+  geom_vline(xintercept=5, linetype=2)+
+ 
+  geom_vline(xintercept=3, linetype=2)+ 
+  geom_vline(xintercept=10, linetype=2)+
 # geom_hex()+
   theme_bw()+
   scale_x_log10()+
   xlab("Expression Replicate B")+
   ylab("Absolute Normalised Residual")+
  ggtitle("How much expression needed for replicability? ", subtitle = "All genes, samples with replicates")
+```
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(t(subset(t(ctall.hk), 
+                 sampleinfo$prep == "Nikos" & 
+                 sampleinfo$ctg %in% 3:4&
+  !(sampleinfo$sample %in% c("O1a", "O1b", "YR1a", "YR1b" , "YR2a", "YR2b")))))
+
+
+si <- subset(sampleinfo, sampleinfo$sample %in% colnames(md))
+
+
+sl <- as.character(sampleinfo$sample[sampleinfo$sample %in% colnames(md)])
+
+md$marker <- rownames(md)
+
+mmd <- gather(as.data.frame(md), key="sample", value="expression", sl) 
+mmd$gp <- substr(mmd$sample, 1, nchar(mmd$sample)-1)
+
+mmd$rep <- substr(mmd$sample,  nchar(mmd$sample), nchar(mmd$sample))
+
+
+md <- select(mmd, -sample) 
+
+
+mmd2 <- left_join( select(dplyr::rename(filter(md, rep=="a"), expression_a =expression), -rep),
+                   select(dplyr::rename(filter(md, rep=="b"), expression_b =expression), -rep),
+                   by=c("marker", "gp") )
+mmd2$ma <- substr(mmd2$marker, 1,2)
+
+ggplot(mmd2, aes(x=expression_a, y=expression_b, label=ma ))+
+  geom_point(aes(colour=ma))+
+  geom_smooth(method="lm")+
+ geom_text(aes(colour=marker))+
+  theme_bw()+
+   scale_x_log10()+
+  scale_y_log10()+
+  xlab("Expression Replicate B")+
+  ylab("Expression Replicate A")+
+ ggtitle("How much expression needed for replicability? ",  subtitle = "Housekeeping genes, samples with replicates")
+  
+  
+ablm <- lm(expression_a~expression_b, data=mmd2)
+#summary(ablm)
+
+mmd2$predexpa <- predict(ablm)
+mmd2$resid <- mmd2$expression_a -mmd2$predexpa
+
+
+mmd2$abfc <- foldchange2logratio(foldchange(mmd2$expression_a, mmd2$expression_b))
+mmd2$absabfc <- abs(mmd2$abfc)
+mmd2$normresid <- mmd2$resid/mmd2$expression_b
+mmd2$absnormresid <- abs(mmd2$normresid)
 
 
 
 
-````
+
+ggplot(mmd2, aes(y=absnormresid, x=expression_b,   label=ma ))+
+  geom_point(aes(colour=ma))+
+  stat_smooth()+
+  geom_vline(xintercept=5, linetype=2)+
+  
+  geom_vline(xintercept=3, linetype=2)+
+  
+  geom_vline(xintercept=10, linetype=2)+
+# geom_hex()+
+  theme_bw()+
+  scale_x_log10()+
+  xlab("Expression Replicate B")+
+  ylab("Absolute Normalised Residual")+
+ ggtitle("How much expression needed for replicability? ", subtitle = "Housekeeping genes, samples with replicates")
+```
+
 
 Anywhere above 5-10 reads starts to look somewhat reasonable here. 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+#View(hkdat)
+
+mhkd <- gather(hkdat, key="threshold", value="numhk", over1, over3,over5,over10)
+  
+mhkd$threshold <- factor(mhkd$threshold, levels= c("over1", "over3","over5","over10"))
+
+
+
+
+ggplot(mhkd, aes(x=numhk))+
+  facet_wrap(~threshold, ncol=1)+
+  geom_bar(fill="red3")+
+  theme_bw()+
+  xlab("number of Housekeeping genes above threshold")+
+  ylab("Samples")
+# 
+# 
+# 
+# ggplot(d2, aes(x = factor(groupchange), y = perc, fill = factor(Symscore3))) +
+#   geom_bar(stat="identity", width = 0.7) +
+#   scale_y_continuous(breaks = brks, labels = scales::percent(brks))
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+ggplot
+
+ggplot(data = hkdat, aes(Var1, Var2, fill = value, label=value))+
+ geom_tile(color = "white")+
+    geom_text(colour="black")
+```
 
 
 #Housekeeping gene expression
@@ -556,7 +664,7 @@ The top few of these are also fairly poor samples that don't fit expected patter
 
 ggplot(mhkall, aes(x=chistat,y=jsdres,colour=flag, label=sample))+
   geom_point()+
- geom_text_repel(size=1)+
+ geom_label()+
   theme_bw()+
 scale_colour_brewer(palette="Set1", name="Sample flagged?")+
   xlab("Chi-stat (proportional expression of housekeeping genes)")+
@@ -565,5 +673,12 @@ scale_colour_brewer(palette="Set1", name="Sample flagged?")+
   scale_y_log10()+
   ggtitle("Deviation from observed/expected: JSD vs Chi-square")
 ````
+
+
+#Proposals
+
+I propose the removal of samples that: 
+
+
 
 
