@@ -155,10 +155,11 @@ mmd2$normresid <- mmd2$resid/mmd2$expression_b
 mmd2$absnormresid <- abs(mmd2$normresid)
 
 
+mmd2$percdiff <-100*(abs(mmd2$expression_a- mmd2$expression_b))/mmd2$expression_b
 
 
 
-ggplot(mmd2, aes(y=absnormresid, x=expression_b))+
+ggplot(mmd2, aes(y=percdiff, x=expression_b))+
   geom_point(alpha=0.1, colour="red2")+
   stat_smooth()+
   geom_vline(xintercept=5, linetype=2)+
@@ -169,7 +170,7 @@ ggplot(mmd2, aes(y=absnormresid, x=expression_b))+
   theme_bw()+
   scale_x_log10()+
   xlab("Expression Replicate B")+
-  ylab("Absolute Normalised Residual")+
+  ylab("% Difference between replicates")+
  ggtitle("How much expression needed for replicability? ", subtitle = "All genes, samples with replicates")
 ```
 
@@ -205,14 +206,17 @@ mmd2$ma <- substr(mmd2$marker, 1,2)
 ggplot(mmd2, aes(x=expression_a, y=expression_b, label=ma ))+
   geom_point(aes(colour=ma))+
   geom_smooth(method="lm")+
- geom_text(aes(colour=marker))+
+ geom_text(aes(colour=ma))+
   theme_bw()+
    scale_x_log10()+
   scale_y_log10()+
   xlab("Expression Replicate B")+
   ylab("Expression Replicate A")+
  ggtitle("How much expression needed for replicability? ",  subtitle = "Housekeeping genes, samples with replicates")
-  
+````
+ 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
   
 ablm <- lm(expression_a~expression_b, data=mmd2)
 #summary(ablm)
@@ -227,10 +231,10 @@ mmd2$normresid <- mmd2$resid/mmd2$expression_b
 mmd2$absnormresid <- abs(mmd2$normresid)
 
 
+mmd2$percdiff <-100*(abs(mmd2$expression_a- mmd2$expression_b))/mmd2$expression_b
 
 
-
-ggplot(mmd2, aes(y=absnormresid, x=expression_b,   label=ma ))+
+ggplot(mmd2, aes(y=percdiff, x=expression_b,   label=ma ))+
   geom_point(aes(colour=ma))+
   stat_smooth()+
   geom_vline(xintercept=5, linetype=2)+
@@ -242,7 +246,7 @@ ggplot(mmd2, aes(y=absnormresid, x=expression_b,   label=ma ))+
   theme_bw()+
   scale_x_log10()+
   xlab("Expression Replicate B")+
-  ylab("Absolute Normalised Residual")+
+  ylab("%diff replicate A")+
  ggtitle("How much expression needed for replicability? ", subtitle = "Housekeeping genes, samples with replicates")
 ```
 
@@ -275,12 +279,98 @@ ggplot(mhkd, aes(x=numhk))+
 ```
 
 
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-ggplot
 
-ggplot(data = hkdat, aes(Var1, Var2, fill = value, label=value))+
- geom_tile(color = "white")+
-    geom_text(colour="black")
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+md <- as.data.frame(t(subset(t(ctall.unnorm), 
+                 sampleinfo$prep == "Nikos" & 
+                 sampleinfo$ctg %in% 3:4&
+  !(sampleinfo$sample %in% c("O1a", "O1b", "YR1a", "YR1b" , "YR2a", "YR2b")))))
+
+
+si <- subset(sampleinfo, sampleinfo$sample %in% colnames(md))
+
+
+sl <- as.character(sampleinfo$sample[sampleinfo$sample %in% colnames(md)])
+
+md$marker <- rownames(md)
+
+mmd <- gather(as.data.frame(md), key="sample", value="expression", sl) 
+mmd$gp <- substr(mmd$sample, 1, nchar(mmd$sample)-1)
+
+mmd$rep <- substr(mmd$sample,  nchar(mmd$sample), nchar(mmd$sample))
+
+
+md <- select(mmd, -sample) 
+
+
+mmd2 <- left_join( select(dplyr::rename(filter(md, rep=="a"), expression_a =expression), -rep),
+                   select(dplyr::rename(filter(md, rep=="b"), expression_b =expression), -rep),
+                   by=c("marker", "gp") )
+
+
+mmd2$percdiff <-100*(abs(mmd2$expression_a- mmd2$expression_b))/mmd2$expression_b
+mmd2 <- subset(mmd2, mmd2$expression_a >0 & mmd2$expression_b >0)
+
+polypercdiff <- lm(percdiff~poly(expression_b,4), data=mmd2)
+
+modpercdiff <- lm(percdiff~expression_b, data=mmd2)
+modpercdiff <- loess(percdiff~expression_b, data=mmd2)
+mmd2$predpdiff <- predict(modpercdiff)
+
+ggplot(mmd2, aes(y=percdiff, x=expression_b))+
+  geom_point(alpha=0.1, colour="red2")+
+  geom_line(aes(y=predpdiff), colour="forest green", size=2)+
+  geom_vline(xintercept=5, linetype=2)+
+ 
+  geom_vline(xintercept=3, linetype=2)+ 
+  geom_vline(xintercept=10, linetype=2)+
+# geom_hex()+
+  theme_bw()+
+  scale_x_log10()+
+  xlab("Expression Replicate B")+
+  ylab("% Difference between replicates")+
+ ggtitle("How much expression needed for replicability? ", subtitle = "All genes, samples with replicates")
+
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.height=20}
+
+
+
+
+mhk <- hkdat[, 1:5]
+
+mhk[mhk < 0.1] <- 1 #LOESS needs values of at least 1
+mhk[mhk > 1000] <-1000
+
+mhk$HLpred = predict(modpercdiff, newdata= mhk[,1])
+mhk$EOpred = predict(modpercdiff, newdata= mhk[,2])
+mhk$EQpred = predict(modpercdiff, newdata= mhk[,3])
+mhk$AQpred = predict(modpercdiff, newdata= mhk[,4])
+mhk$BSpred = predict(modpercdiff, newdata= mhk[,5])       
+
+mhk$meanpred <- rowMeans(mhk[,6:10])
+
+mhk$sample <- rownames(mhk)
+
+
+
+mhk$sample <- factor(mhk$sample, levels=mhk$sample[order(mhk$meanpred)])
+mhk$flag <- mhk$sample %in% sampleinfo$sample[sampleinfo$flag ==T]
+
+ggplot(mhk, aes(y=meanpred,x=sample, fill=flag))+
+  geom_bar(stat="identity")+
+coord_flip()+
+  theme_bw()+
+ ylab("Predicted replicability (from mean of 5 housekeeping genes)")+
+scale_fill_brewer(palette="Set1")+
+  ggtitle("Sample trustworthiness")
 ```
 
 
@@ -298,6 +388,11 @@ hkexp <- melt(mhk[,1:5])
 ggplot(hkexp, aes(x=value, fill=variable))+
   geom_density(alpha=0.6)+
   theme_bw()+
+  geom_vline(xintercept=5, linetype=2)+
+  
+  geom_vline(xintercept=3, linetype=2)+
+  
+  geom_vline(xintercept=10, linetype=2)+
   scale_fill_brewer(palette = "Set1", name="Housekeeping \nGene")+
   facet_wrap(~variable)+
   scale_x_log10()+
@@ -305,6 +400,10 @@ ggplot(hkexp, aes(x=value, fill=variable))+
   ggtitle("Expression ranges of Housekeeping genes")
 
 ````
+
+From previous
+
+
 
 #Housekeeping Gene intercorrelation
 
@@ -331,6 +430,8 @@ cormat <-cormat[hc$order, hc$order]
   
 
 mhk <- hkdat[, 1:5]
+
+
 mhk <- mhk[ , order(names(mhk))]
 cormat <- round(cor(mhk),2)  
   

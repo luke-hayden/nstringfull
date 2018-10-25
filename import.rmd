@@ -27,7 +27,53 @@ load(file="markerchoiceinfo.rdata")
 ````
 
 
-#Normalised Fully
+#Normalised Fully: Housekeeping.geo.mean
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+ctg1and2.geo.norm <- NanoStringNorm(x = ct1and2.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.geo.mean', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg3and4.geo.norm <- NanoStringNorm(x = ct3and4.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.geo.mean', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg5and6.geo.norm <- NanoStringNorm(x = ct5and6.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.geo.mean', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg5and6hi.geo.norm <- NanoStringNorm(x = ct5and6hi.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.geo.mean', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg7and8.geo.norm <- NanoStringNorm(x = ct7and8.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.geo.mean', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg7and8hi.geo.norm <- NanoStringNorm(x = ct7and8hi.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.geo.mean', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ctg9.geo.norm <- NanoStringNorm(x = ct9.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.geo.mean', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+
+ctg1011.geo.norm <- NanoStringNorm(x = ct1011.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.geo.mean', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg1213.geo.norm <- NanoStringNorm(x = ct1213.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.geo.mean', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg14.geo.norm <- NanoStringNorm(x = ct14.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.geo.mean', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ctg15.geo.norm <- NanoStringNorm(x = ct15.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.geo.mean', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+ct1015.geo.norm <- rownames_to_column(as.data.frame(cbind(ctg1011.geo.norm,ctg1213.geo.norm, ctg14.geo.norm)) )%>%
+  left_join(rownames_to_column(as.data.frame(ctg15.geo.norm)))
+
+
+ctg1to9.geo.norm <- cbind(ctg1and2.geo.norm, ctg3and4.geo.norm, ctg5and6hi.geo.norm, ctg7and8hi.geo.norm, ctg9.geo.norm)
+
+ctall.geo.norm <- cbind(ctg1to9.geo.norm, ct1015.geo.norm)
+
+rownames(ct1015.geo.norm) <- ct1015.geo.norm$marker
+ct1015.geo.norm$rowname <- NULL
+
+
+```
+
+#Normalised Fully: Housekeeping.sum
+
 
 
 
@@ -176,6 +222,10 @@ ctg9.hk <- subset(ctg9.matr, rownames(ctg9.matr) %in% hknames)
 
 ctall.norm <- cbind(ctg1to9, as.matrix(ct1015.norm))
 
+
+
+ctall.geo.norm <- cbind(ctg1to9.geo.norm, as.matrix(ct1015.norm))
+
 ctall.unnorm <- cbind(ctg1to9un, as.matrix(ct1015.unnorm))
 
 ctall.intonly <- cbind(ctg1to9intonly, as.matrix(ct1015.intonly))
@@ -185,6 +235,8 @@ ctall.hk <- cbind(ctg1and2.hk, ctg3and4.hk, ctg5and6hi.hk, ctg7and8hi.hk, ctg9.h
 
 sampleinfo <- read.csv("siall.csv")
 colnames(ctall.norm) <- sampleinfo$sample
+
+colnames(ctall.geo.norm) <- sampleinfo$sample
 
 colnames(ctall.unnorm) <- sampleinfo$sample
 
@@ -210,6 +262,45 @@ sampleinfo$wkage <- difftime( parse_date_time("07/07/18",c('dmy')), sampleinfo$c
 
 
 
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+normcomp <- melt(rownames_to_column(ctall.geo.norm)) 
+
+colnames(normcomp) <- c("marker", "sample", "geo")
+
+#names(normcomp)[names(normcomp) == 'value'] <- 'geo'
+
+normcomp <- left_join(normcomp, melt(rownames_to_column(as.data.frame(ctall.norm))), by=c("marker" ="rowname", "sample" = "variable") )
+
+names(normcomp)[names(normcomp) == 'value'] <- 'sum'
+
+normcomp$flag <- normcomp$sample %in% sampleinfo$sample[sampleinfo$flag==T]
+# normcomp$logeo <- log10(normcomp$geo)
+# normcomp$logsum <- log10(normcomp$sum)
+normcompnon0 <- subset(normcomp, normcomp$geo >0 & normcomp$sum >0)
+
+sglm <- lm(log(geo)~log(sum), data=normcompnon0)
+
+
+ggplot(normcompnon0, aes(x=geo, y=sum, label=sample ))+
+  geom_point(aes(colour=flag), alpha=0.1)+
+  xlab()
+  scale_y_log10()+
+  scale_x_log10()+
+  theme_bw()+
+  scale_colour_brewer(palette="Set1")+
+#  geom_text(aes(colour=flag))+
+  geom_smooth(method="lm")+
+  ggtitle("Comparing methods of normalising via Housekeeping genes", 
+          subtitle= paste0("R2 of correlation: ", round(summary(sglm)$r.squared, 4)))+
+    xlab("Using geometric mean of Housekeeping genes")+
+    ylab("Using sum of Housekeeping genes")
+
+````
+
+
+
+
+
 
 
 
@@ -228,7 +319,7 @@ sampleinfo <- left_join(sampleinfo, posdf, by= "key")
 
 
 
-save(ctall.norm,ctallgood.norm, codeset,geneinf,ctall.unnorm, ctall.intonly ,ctall.hk, file="allns_data.rdata")
+save(ctall.norm,ctallgood.norm, codeset,geneinf,ctall.unnorm,ctall.geo.norm, ctall.intonly ,ctall.hk, file="allns_data.rdata")
 
 save(sampleinfo , file="sampleinfo.rdata")
 
