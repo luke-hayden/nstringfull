@@ -18,6 +18,7 @@ library(gtools)
 library(GGally)
 library(philentropy)
 library(ggrepel)
+library(Rmisc)
 ```
 
 #Intro
@@ -37,6 +38,7 @@ Should expect consistent ratios
 #setwd("~/Documents/nstringjul18")
 load(file="allns_data.rdata")
 load(file="sampleinfo.rdata")
+load(file="models.rdata")
 ````
 
 
@@ -89,6 +91,169 @@ hkdat$sample <- rownames(hkdat)
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 save(hkdat, file="hkdat.rdata")
 
+````
+
+
+
+#Normalisation
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+normcomp <- melt(rownames_to_column(ctall.geo.norm)) 
+
+colnames(normcomp) <- c("marker", "sample", "geo")
+
+#names(normcomp)[names(normcomp) == 'value'] <- 'geo'
+
+normcomp <- left_join(normcomp, melt(rownames_to_column(as.data.frame(ctall.norm))), by=c("marker" ="rowname", "sample" = "variable") )
+
+names(normcomp)[names(normcomp) == 'value'] <- 'sum'
+
+normcomp$flag <- normcomp$sample %in% sampleinfo$sample[sampleinfo$flag==T]
+# normcomp$logeo <- log10(normcomp$geo)
+# normcomp$logsum <- log10(normcomp$sum)
+normcompnon0 <- subset(normcomp, normcomp$geo >0 & normcomp$sum >0)
+
+sglm <- lm(log(geo)~log(sum), data=normcompnon0)
+
+
+ggplot(normcompnon0, aes(x=geo, y=sum, label=sample ))+
+  geom_point(aes(colour=flag), alpha=0.1)+
+  scale_y_log10()+
+  scale_x_log10()+
+  theme_bw()+
+  scale_colour_brewer(palette="Set1")+
+#  geom_text(aes(colour=flag))+
+  geom_smooth(method="lm")+
+  ggtitle("Comparing methods of normalising via Housekeeping genes", 
+          subtitle= paste0("R2 of correlation: ", round(summary(sglm)$r.squared, 4)))+
+    xlab("Using geometric mean of Housekeeping genes")+
+    ylab("Using sum of Housekeeping genes")
+
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+mymodel <- currbest
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"& 
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+
+md$rfagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample")
+
+md <- subset(md, !(is.na(md$predage)))
+
+
+RMSEtr <- sqrt(mean( (md$rfagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+
+
+
+
+
+RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+psum=ggplot(md, aes(x=predage, y=rfagepred,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression (random forest model)")+
+  geom_smooth(method="lm", colour="black")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"), guide=F)+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age \nNormalisation by sum", 
+          subtitle=paste0("RMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3)))#+  facet_wrap(~intrain)
+
+
+#ggsave(plot=p,height=5,width=6,dpi=200, filename=paste("modeltrte.pdf"), useDingbats=FALSE, limitsize = FALSE)
+
+
+```
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+mymodel <- georfmodel
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"& 
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+
+md$rfagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample")
+
+md <- subset(md, !(is.na(md$predage)))
+
+
+RMSEtr <- sqrt(mean( (md$rfagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+
+
+
+
+
+RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+pgeo=ggplot(md, aes(x=predage, y=rfagepred,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression (random forest model)")+
+  geom_smooth(method="lm", colour="black")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age \nGeometric normalisation", 
+          subtitle=paste0("RMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3)))#+  facet_wrap(~intrain)
+
+
+#ggsave(plot=p,height=5,width=6,dpi=200, filename=paste("modeltrte.pdf"), useDingbats=FALSE, limitsize = FALSE)
+
+
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+multiplot(psum, pgeo, cols=2)
 ````
 
 #Expression levels and replicability
