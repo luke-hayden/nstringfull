@@ -85,6 +85,14 @@ hkdat$over5 <- rowSums(t(ctall.hk)>5)
 
 hkdat$over10 <- rowSums(t(ctall.hk)>10)
 
+
+
+hkdat$over20 <- rowSums(t(ctall.hk)>20)
+
+
+
+hkdat$over40 <- rowSums(t(ctall.hk)>40)
+
 hkdat$sample <- rownames(hkdat)
 
 ````
@@ -436,9 +444,9 @@ Anywhere above 5-10 reads starts to look somewhat reasonable here.
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 #View(hkdat)
 
-mhkd <- gather(hkdat, key="threshold", value="numhk", over1, over3,over5,over10)
+mhkd <- gather(hkdat, key="threshold", value="numhk", over1, over3,over5,over10, over20, over40)
   
-mhkd$threshold <- factor(mhkd$threshold, levels= c("over1", "over3","over5","over10"))
+mhkd$threshold <- factor(mhkd$threshold, levels= c("over1", "over3","over5","over10", "over20", "over40"))
 
 
 
@@ -450,7 +458,9 @@ variable_labeller <- function(variable,value){
 variable_names <- list( "over1"=                   paste("At least 1 read"), 
  "over3"=                 paste("At least 3 reads"), 
   "over5"=                paste("At least 5 reads"),
-    "over10" =              paste("At least 10 reads")
+    "over10" =              paste("At least 10 reads"),
+    "over20" =              paste("At least 20 reads"),
+    "over40" =              paste("At least 40 reads")
                                      )
 
 
@@ -568,8 +578,8 @@ quanthk <- mhk
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-quantcomp <- left_join(quanthk, hkdat[6:10], by="sample")
-mquantcomp <- gather(quantcomp, key="threshold", value="numhk", over1, over3,over5,over10)
+quantcomp <- left_join(quanthk, hkdat[6:12], by="sample")
+mquantcomp <- gather(quantcomp, key="threshold", value="numhk", over1, over3,over5,over10, over20, over40)
 
 
 variable_labeller <- function(variable,value){
@@ -580,8 +590,11 @@ variable_labeller <- function(variable,value){
 variable_names <- list( "over1"=                   paste("At least 1 read"), 
  "over3"=                 paste("At least 3 reads"), 
   "over5"=                paste("At least 5 reads"),
-    "over10" =              paste("At least 10 reads")
+    "over10" =              paste("At least 10 reads"),
+    "over20" =              paste("At least 20 reads"),
+    "over40" =              paste("At least 40 reads")
                                      )
+mquantcomp$threshold <- factor(mquantcomp$threshold, levels= c("over1", "over3","over5","over10","over20","over40"))
 
 
 
@@ -970,7 +983,7 @@ mhkall$jsdres <- unlist(jsd.result)
 mhkall$sample <- rownames(mhkall)
 mhkall <- left_join( select(mhkall, sample, jsdres), chimhkall, by="sample")%>%
   left_join(select(quanthk, HLpred,   "EOpred" ,  "EQpred"  , "AQpred" ,  "BSpred" ,  "meanpred", "sample"), by="sample") %>%
-  left_join(hkdat[,6:10], by="sample")
+  left_join(hkdat[,6:12], by="sample")
 
 mhkall$sample <- factor(mhkall$sample, levels=mhkall$sample[order(mhkall$jsdres)])
 (p=ggplot(mhkall, aes(y=jsdres,x=sample, fill=flag))+
@@ -1040,23 +1053,15 @@ scale_colour_brewer(palette="Set1", name="Sample flagged?")+
 ````
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-mmhkall<- gather(mhkall, key="threshold", value="numhk", over1, over3,over5,over10)
+mmhkall<- gather(mhkall, key="threshold", value="numhk", over1, over3,over5,over10, over20, over40)
   
-mmhkall$threshold <- factor(mmhkall$threshold, levels= c("over1", "over3","over5","over10"))
+mmhkall$threshold <- factor(mmhkall$threshold, levels= c("over1", "over3","over5","over10", "over20", "over40"))
 
 
 
 variable_labeller <- function(variable,value){
   return(variable_names[value])
 }
-
-
-variable_names <- list( "over1"=                   paste("At least 1 read"), 
- "over3"=                 paste("At least 3 reads"), 
-  "over5"=                paste("At least 5 reads"),
-    "over10" =              paste("At least 10 reads")
-                                     )
-
 
 
 
@@ -1084,11 +1089,12 @@ I propose the following cutoffs:
 This is quite stringent, cutting samples available down to:  
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-qualsum <- select(mhkall, sample, chistat, jsdres, meanpred, over1, over3, over5, over10, flag)
+qualsum <- select(mhkall, sample, chistat, jsdres, meanpred, over1, over3, over5, over10,over20, over40, flag)
 
 qualsum$good <- qualsum$chistat <1000& qualsum$over3 >3 & qualsum$flag ==F
 
 
+qualsum$good <- qualsum$chistat <500& qualsum$over10 >=1 & qualsum$flag ==F
 
 ```
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
@@ -1100,75 +1106,94 @@ sum(qualsum$good)
 #Building a random forest model with stringent quality control 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-# qualsum <- select(mhkall, sample, chistat, jsdres, meanpred, over1, over3, over5, over10, flag)
-# 
-# qualsum$good <- qualsum$chistat <1000& qualsum$over3 >3 & qualsum$flag ==F
-# 
-# qualsum$sample[!qualsum$good]
-# 
-# md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
-# #               sampleinfo$qual == "ok"& 
-#                  sampleinfo$prep== "Luke"&
-#                  sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
-#  #                sampleinfo$ctg>2 & 
-#                 sampleinfo$codeset == "phaw_1" &
-#                  sampleinfo$type %in% c("O", "Y", "M")
-# ))
-# 
-# md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
-# md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
-# 
-# md <- md[,colnames(md) %in% currbest$coefnames]
-# 
-# md <- as.data.frame(subset(t(ctall.norm), sik$sex == "F" &
-# 
-#                  sik$prep== "Luke"&
-#                  sik$exp %in% c("Size-age", "cohorts", "OvY") &
-#                  sik$ctg>2 &
-#                 sik$codeset == "phaw_1" &
-#                  sik$type %in% c("O", "Y", "M")&
-#                   sik$good
-# ))
-# 
-# md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
-# 
-# 
-# 
-# 
-# md$sample <- rownames(md)
-# 
-# md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
-#   filter(!(is.na(predage))) %>%
-#   column_to_rownames(var="sample")
-# 
-# 
-# trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
-# 
-# 
-# trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
-# trdat <- md[trainchoice,]
-# tedat <- md[-trainchoice,]
-# 
-# # 
-# # 
-# # rfagemodel <- train(
-# #   predage~.,
-# #   tuneLength = 4,
-# #   metric="RMSE",
-# #   num.trees=2000,
-# #   importance = "permutation",
-# #   data = trdat, method = "ranger",
-# #   tuneGrid=expand.grid(mtry=c(10:20),
-# #                         splitrule=c("extratrees", "variance"),
-# #                         min.node.size=c(1:10)),
-# #   trControl = trainControl(method = "cv", number = 40, verboseIter = T)
-# # )
-# 
-# 
-# 
-# 
-# mymodel <- currbest
+
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"& 
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
+
+md$sample <- rownames(md)
+
+
+md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
+  filter(!(is.na(predage))) %>%
+  column_to_rownames(var="sample")
+
+olist <- rownames(md)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"&
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+ #                sampleinfo$ctg>2 &
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")
+))
+
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
+
+md$sample <- rownames(md)
+
+md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
+  filter(!(is.na(predage))) %>%
+  column_to_rownames(var="sample")
+
+glist <- rownames(md)
+
+
+
+```
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+olist[!(olist %in% glist)]
+
+glist[!(glist %in% olist)]
+
+
+```
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
+
+
+trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+trdat <- md[trainchoice,]
+tedat <- md[-trainchoice,]
+
+
+
+rfagemodel <- train(
+  predage~.,
+  tuneLength = 4,
+  metric="RMSE",
+  num.trees=2000,
+  importance = "permutation",
+  data = trdat, method = "ranger",
+  tuneGrid=expand.grid(mtry=c(10:20),
+                        splitrule=c("extratrees", "variance"),
+                        min.node.size=c(1:10)),
+  trControl = trainControl(method = "cv", number = 40, verboseIter = T)
+)
+````
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+mymodel <- currbest
 mymodel <- qualrfmodel
+mymodel <- rfagemodel
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"& 
