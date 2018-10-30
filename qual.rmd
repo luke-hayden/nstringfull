@@ -1081,7 +1081,7 @@ I propose the following cutoffs:
 
 -Sample unflagged by internal controls
 
--At least 4 housekeeping genes expressed with at least 3 reads each
+-At least 1 housekeeping genes expressed with at least 10 reads each
 
 -Chi-stat under 1000 for housekeeping gene ratios 
 
@@ -1091,15 +1091,19 @@ This is quite stringent, cutting samples available down to:
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 qualsum <- select(mhkall, sample, chistat, jsdres, meanpred, over1, over3, over5, over10,over20, over40, flag)
 
-qualsum$good <- qualsum$chistat <1000& qualsum$over3 >3 & qualsum$flag ==F
-
-
 qualsum$good <- qualsum$chistat <500& qualsum$over10 >=1 & qualsum$flag ==F
+
+
+#qualsum$good <- qualsum$chistat <500& qualsum$over10 >=1 & qualsum$flag ==F
+
+qualsum$sample[qualsum$good]
 
 ```
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 sum(qualsum$good)
+
+save(qualsum, file="qualitydat.rdata")
 ```
 (Out of 180 samples)
 
@@ -1169,7 +1173,7 @@ trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
 
 trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
 trdat <- md[trainchoice,]
-tedat <- md[-trainchoice,]
+tedat <-   md[!(rownames(md) %in% rownames(trdat)),]
 
 
 
@@ -1190,7 +1194,6 @@ rfagemodel <- train(
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
-
 mymodel <- currbest
 mymodel <- qualrfmodel
 mymodel <- rfagemodel
@@ -1204,20 +1207,28 @@ md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
                  sampleinfo$type %in% c("O", "Y", "M")
 ))
 
+md <-  as.data.frame(subset(t(ctall.norm), sampleinfo$sample %in% glist) )
+
+
+
+
+
 md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
 md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
-
-
 md$rfagepred <- predict(mymodel, newdata=md)
 
+md <- rbind(trdat, tedat)
+
+md$rfagepred <- predict(mymodel, newdata=md)
 
 md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
 
 
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
 
 md <- md %>%
   rownames_to_column(var="sample") %>%
-  left_join(sampleinfo,  by="sample")
+  left_join(select(sampleinfo, -predage),  by="sample")
 
 md <- subset(md, !(is.na(md$predage)))
 
@@ -1241,7 +1252,8 @@ RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F
   ggtitle("Using Marker gene expression to predict age", 
           subtitle=paste0("RMSE in training data: ", round(RMSEtr,3), 
                           "\nRMSE in test data: ", round(RMSEte,3))))#+  facet_wrap(~intrain)
+
+save(qualrfmodel, file="qualmod.rdata")
+
 ```
 
-
-Not bad, but needs to be optimised further. This may be overly stringent and have cut the training dataset down too much. 
