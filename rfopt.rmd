@@ -27,11 +27,10 @@ library(FinCal)
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 #setwd("~/Documents/nstringjul18")
 load(file="allns_data.rdata")
-
-
-#save(cvdf,lmdf, lmdf2,  file="vardat.rdata")
+load(file="sampleinfo.rdata")
+load(file="qualitydat.rdata")
 load(file="vardat.rdata")
-load(file="models.rdata")
+load(file="modelrf.rdata")
 
 ````
 #Optimising random forest
@@ -51,53 +50,19 @@ splitting model: variance or "extratrees"
 This is how they affect the model, below. Note: lower RMSE is better. 
 
 
-
-
-
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-#Random forest
-md <- as.data.frame(subset(t(ctall.geo.norm), sampleinfo$sex == "F" &
 
-                 sampleinfo$prep== "Luke"&
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
-                 sampleinfo$ctg>2 &
-                sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$type %in% c("O", "Y", "M")
-&   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))
-))
-md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
-
-
-md <- as.data.frame(subset(t(ctall.geo.norm), sampleinfo$sex == "F" &
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
                  sampleinfo$prep== "Luke"&
                  sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
  #                sampleinfo$ctg>2 &
                 sampleinfo$codeset == "phaw_1" &
                  sampleinfo$type %in% c("O", "Y", "M")
-&   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))
 ))
 
-#md <- md[,minf$chosenand ==T]
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
 md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
-
-#md <- md[,colnames(md) %in% currbest$coefnames]
-
-# 
-# md <- as.data.frame(subset(t(ctall.norm), sik$sex == "F" &
-# 
-#                  sik$prep== "Luke"&
-#                  sik$exp %in% c("Size-age", "cohorts", "OvY") &
-#                  sik$ctg>2 &
-#                 sik$codeset == "phaw_1" &
-#                  sik$type %in% c("O", "Y", "M")&   
-#                   sik$good
-# ))
-# 
-# md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
-
-
-
 
 md$sample <- rownames(md)
 
@@ -105,13 +70,12 @@ md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
   filter(!(is.na(predage))) %>%
   column_to_rownames(var="sample")
 
-
 trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
 
 
 trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
 trdat <- md[trainchoice,]
-tedat <- md[-trainchoice,]
+tedat <-   md[!(rownames(md) %in% rownames(trdat)),]
 
 
 
@@ -127,9 +91,7 @@ rfagemodel <- train(
                         min.node.size=c(1:10)),
   trControl = trainControl(method = "cv", number = 40, verboseIter = T)
 )
-```
-
-
+````
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
@@ -139,7 +101,7 @@ plot(rfagemodel)
 ````
 
 
-The last of these has had by far the most importance in dealing with overfitting. Using most (47) of the 61 markers from the 2nd codeset, we get the followign model.
+The last of these has had by far the most importance in dealing with overfitting. Using most (47) of the 61 markers from the 2nd codeset, we get the following model.
 
 
 
@@ -149,18 +111,18 @@ The fit is like this:
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 mymodel <- currbest
-mymodel <- rfagemodel
+#mymodel <- rfagemodel
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
-#               sampleinfo$qual == "ok"& 
+#               sampleinfo$qual == "ok"&
                  sampleinfo$prep== "Luke"&
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
- #                sampleinfo$ctg>2 & 
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+ #                sampleinfo$ctg>2 &
                 sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$type %in% c("O", "Y", "M")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+                 sampleinfo$type %in% c("O", "Y", "M")
+))
 
-
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
 
 md <- md[,colnames(md) %in% mymodel$coefnames]
 
@@ -206,12 +168,14 @@ RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F
 
 ```
 
+
+
 Which looks to be a pretty major improvement in terms of dealing with the overfitting. Some additional optimisation may help some more. 
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-##Model accuracy: cohort age data
-#   
+#Model accuracy: cohort age data
+# 
 # (p=ggplot(md, aes(x=wkage, y=rfagepred))+
 #   geom_point()+
 #   xlab("Age (weeks): cohorts") +
@@ -228,18 +192,15 @@ Which looks to be a pretty major improvement in terms of dealing with the overfi
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-#save(currbest,file="models.rdata")
+save(currbest,file="modelrf.rdata")
 
 ```
 
 
 
-
-
-
-
+Current best:
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-###Random forest: current best attempt
+
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
                  sampleinfo$prep== "Luke"&
@@ -247,12 +208,10 @@ md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
  #                sampleinfo$ctg>2 &
                 sampleinfo$codeset == "phaw_1" &
                  sampleinfo$type %in% c("O", "Y", "M")
-&   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))
 ))
 
-#md <- md[,minf$chosenand ==T]
-md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.03]
-
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
 
 md$sample <- rownames(md)
 
@@ -260,13 +219,12 @@ md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
   filter(!(is.na(predage))) %>%
   column_to_rownames(var="sample")
 
-
 trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
 
 
-#trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
 trdat <- md[trainchoice,]
-tedat <- md[-trainchoice,]
+tedat <-   md[!(rownames(md) %in% rownames(trdat)),]
 
 
 
@@ -274,15 +232,15 @@ rfagemodel <- train(
   predage~.,
   tuneLength = 4,
   metric="RMSE",
+  num.trees=2000,
+  importance = "permutation",
   data = trdat, method = "ranger",
   tuneGrid=expand.grid(mtry=c(10:20),
                         splitrule=c("extratrees", "variance"),
                         min.node.size=c(1:10)),
   trControl = trainControl(method = "cv", number = 40, verboseIter = T)
 )
-```
-
-
+````
 
 
 
@@ -324,7 +282,7 @@ vrimprf$sname <- factor(vrimprf$sname, levels=vrimprf$sname[order(vrimprf$Overal
   ggtitle("Marker contributions", subtitle= paste0("random forest model built with ", length(mymodel$coefnames), " markers"))
 )
 
-ggsave(plot=p,height=5,width=5,dpi=200, filename=paste("contribs.pdf"), useDingbats=FALSE, limitsize = FALSE)
+#ggsave(plot=p,height=5,width=5,dpi=200, filename=paste("contribs.pdf"), useDingbats=FALSE, limitsize = FALSE)
 ````
 
 

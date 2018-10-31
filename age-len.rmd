@@ -45,6 +45,8 @@ powerTransform <- function(y, lambda1, lambda2 = NULL, method = "boxcox") {
 
 #setwd("~/Documents/nstringjul18")
 load(file="allns_data.rdata")
+
+load(file="sampleinfo.rdata")
 zklen <- read.csv("zk-age-len.csv")[2:3] %>%
   mutate(prep="ZK")
 
@@ -238,7 +240,7 @@ sampleinfo$predage <- NULL
 preddf <-subset(sampleinfo, !is.na(sampleinfo$length))
 
 preddf$bctranslen <- powerTransform(preddf$length, lambda)
-preddf$predage <-  predict(mnew, newdata=preddf)
+preddf$predage <-  predict(polymod3, newdata=preddf)
 
 
 sampleinfo <- left_join(sampleinfo, dplyr::select(preddf, sample, predage), by="sample")
@@ -252,8 +254,7 @@ sampleinfo <- left_join(sampleinfo, dplyr::select(preddf, sample, predage), by="
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
-save(sampleinfo,ctall.norm,ctallgood.norm, codeset,geneinf,ctall.unnorm, ctall.intonly ,minf, file="allns_data.rdata")
-
+save(sampleinfo , file="sampleinfo.rdata")
 
 ```
 

@@ -16,12 +16,12 @@ library(tidyr)
 library(lubridate)
 ````
 
-
+Important: run imp1.r before this script
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
-load(file="nov17main_data.rdata")
+#load(file="nov17main_data.rdata")
 load(file="markerchoiceinfo.rdata")
 
 ````
@@ -324,81 +324,6 @@ save(ctall.norm,ctallgood.norm, codeset,geneinf,ctall.unnorm,ctall.geo.norm, cta
 save(sampleinfo , file="sampleinfo.rdata")
 
 ````
-
-
-
-
-
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-
-log <- sampleinfo$reg == "" & 
-  !(sampleinfo$age %in% c("N")) & 
-  sampleinfo$sex == "F"&
-  sampleinfo$exp %in% c("OvY", "Size-age", "cohorts") & 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB", "LFIA", "LFIB", "LFIC", "LFID")) &
-#  sampleinfo$over10reads > 100 &
-  sampleinfo$ctg > 2 &
-  sampleinfo$ctg <10 &
-  sampleinfo$prep == "Luke"
-
-bcmin <- as.matrix(ctallgood.norm[,log== TRUE])
-bcmin.groups <- subset(sampleinfo$type, log==TRUE)
-tbc <- as.matrix(t(bcmin))
-bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
-bc.groups <- bcmin.groups
-
-
-ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+ggtitle("PCA of Old vs Young (females)")+
-    theme_minimal() +
-#  scale_colour_manual(values=c("cornflower blue", "red3", "black"))+
-  theme(plot.title=element_text(size=8,face="bold"))+
-#  geom_label(label=rownames(tbc), aes(colour=bc.groups))+
-  scale_colour_manual(values= c("darkviolet","cornflower blue",  "red2"))
-
-log <- sampleinfo$reg == "" & 
-  !(sampleinfo$age %in% c("N", "M")) & 
-  sampleinfo$sex == "F"&
-  sampleinfo$exp %in% c("OvY", "Size-age") & 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB")) &
-  sampleinfo$over10reads >90 &
-  sampleinfo$ctg > 2 &
-  sampleinfo$ctg >9 &
-  sampleinfo$prep == "Luke"
-
-
-rg <-as.matrix(ctallgood.norm[,log== TRUE])
-
-rg.groups <- sampleinfo$type[sampleinfo$sample %in% colnames(rg)]
-
-rg.sc <- scale(t(rg), center= bc.pca$center)
-rg.pred <- rg.sc %*% bc.pca$rotation 
-
-
-rgd.pca <- bc.pca
-rgd.pca$x <- rbind(bc.pca$x, rg.pred)
-                   
-                   
-rgd.groups <- c(paste(as.character(bcmin.groups), "(old)"), paste(as.character(rg.groups), "(new)" )    )           
-
-ggbiplot(rgd.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = F, var.axes=FALSE, labels=rownames(rgd.pca$x), groups=rgd.groups, varname.abbrev = TRUE)+   
-  theme_bw() +
-  theme(legend.direction = 'horizontal', legend.position = 'top')+
-  ggtitle("PCA Old vs Young + regenerated projected")
-
-
-
-
-
-
-
-
-````
-
-
 
 
 

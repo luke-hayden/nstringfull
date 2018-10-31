@@ -60,30 +60,18 @@ Using 61 markers
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 #Random forest
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
-
+#               sampleinfo$qual == "ok"&
                  sampleinfo$prep== "Luke"&
                  sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
-                 sampleinfo$ctg>2 &
+ #                sampleinfo$ctg>2 &
+                sampleinfo$codeset == "phaw_1" &
                  sampleinfo$type %in% c("O", "Y", "M")
-&   !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))
 ))
-md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
+
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+md <- md[, lmdf2$in61 ==T]
 
 #md <- md[,colnames(md) %in% currbest$coefnames]
-
-
-md <- as.data.frame(subset(t(ctall.norm), sik$sex == "F" &
-
-                 sik$prep== "Luke"&
-                 sik$exp %in% c("Size-age", "cohorts", "OvY") &
-                 sik$ctg>2 &
-                sik$codeset == "phaw_1" &
-                 sik$type %in% c("O", "Y", "M")&   
-                  sik$good
-))
-
-md <- md[, lmdf2$in61 ==T ]
-
 
 
 
@@ -97,9 +85,9 @@ md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
 trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
 
 
-#trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
 trdat <- md[trainchoice,]
-tedat <- md[-trainchoice,]
+tedat <-   md[!(rownames(md) %in% rownames(trdat)),]
 
 
 
@@ -119,15 +107,6 @@ rfagemodel61 <- train(
 
 
 
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-plot(rfagemodel61)
-#rfagemodel$trainingData
-#summary(currbest$finalModel)
-````
-
-
-
 ##Model accuracy: age from body length regression
 
 
@@ -137,13 +116,15 @@ mymodel <- rfagemodel61
 
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
-#               sampleinfo$qual == "ok"& 
+
                  sampleinfo$prep== "Luke"&
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
- #                sampleinfo$ctg>2 & 
-                sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$type %in% c("O", "Y", "M")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+                 sampleinfo$ctg>2 &
+                 sampleinfo$type %in% c("O", "Y", "M") &
+                sampleinfo$sample %in% glist
+)
+)
+md <- md[, lmdf2$in61 ==T]
 
 
 
@@ -227,7 +208,7 @@ vrimprf$groupin <- as.factor(vrimprf$groupin)
   ggtitle("Marker contributions", subtitle= paste0("random forest model built with ", length(mymodel$coefnames), " markers"))
 )
 
-
+save(rfagemodel61, file="progmodels.rdata")
 ````
 
 
@@ -272,21 +253,20 @@ tedat <- md[-trainchoice,]
 
 
 
-rfagemodel <- train(
+currmodel <- train(
   predage~.,
   tuneLength = 4,
   metric="RMSE",
-  num.trees=2000,
-  importance = "permutation",
-  data = trdat, method = "ranger",
-  tuneGrid=expand.grid(mtry=c(10:20),
-                        splitrule=c("extratrees", "variance"),
-                        min.node.size=c(1:10)),
+#  num.trees=2000,
+ # importance = "permutation",
+  data = trdat, method = "lm",
+  #tuneGrid=expand.grid(mtry=c(10:20),
+   #                     splitrule=c("extratrees", "variance"),
+    #                    min.node.size=c(1:10)),
   trControl = trainControl(method = "cv", number = 1, verboseIter = T)
 )
 
-modellist[i] <- rfagemodel
-
+modellist[i] <- currmodel
 }
 
 
