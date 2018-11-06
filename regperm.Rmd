@@ -1,0 +1,114 @@
+---
+title: "regperm"
+output: html_document
+---
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+library(dplyr)
+library(ggbiplot)
+library(tibble)
+library(tidyr)
+library(caret)
+library(RColorBrewer)
+library(ggrepel)
+library(gtools)
+library(FinCal)
+library(ggrepel)
+#library(e10)
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+#setwd("~/Documents/nstringjul18/nstringfull")
+load(file="allns_data.rdata")
+load(file="modelrf.rdata")
+load(file="modelgbm.rdata")
+load(file="hkdat.rdata")
+load(file="sampleinfo.rdata")
+
+
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+md <- as.data.frame(subset(t(ctall.norm), 
+                           (sampleinfo$sex == "F" &
+                 sampleinfo$exp %in% c("regen") & 
+                  sampleinfo$ctg > 5 &
+                   substr(sampleinfo$sample,1,1) %in% goodgroups &
+                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")
+ )))
+
+mymodel <- currbestgbm
+
+mymodel <- rfagemodel61
+md <- md[, colnames(md) %in% mymodel$coefnames]
+
+regs <- subset(md, substr(rownames(md),2,4) == "reg")
+
+
+uns <- subset(md, substr(rownames(md),2,3) == "un")
+
+r <- nrow(regs)
+c <- ncol(regs)
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+m1 <- as.data.frame(round(matrix(runif(r*c), r, c)))
+rownames(m1) <- rownames(regs)
+colnames(m1) <- colnames(regs)
+
+
+
+mm1 <- melt(rownames_to_column(m1))
+
+mregs <- melt(rownames_to_column(regs))
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+````

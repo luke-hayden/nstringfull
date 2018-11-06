@@ -1,7 +1,6 @@
 ---
 title: "Regeneration effect"
 author: "Luke Hayden"
-date: "August 3, 2018"
 output: html_document
 ---
 
@@ -28,6 +27,8 @@ load(file="allns_data.rdata")
 load(file="modelrf.rdata")
 load(file="modelgbm.rdata")
 load(file="hkdat.rdata")
+load(file="sampleinfo.rdata")
+load(file="qualitydat.rdata")
 
 
 sik <- left_join(sampleinfo, hkdat, by="sample")
@@ -36,80 +37,8 @@ sik <- left_join(sampleinfo, hkdat, by="sample")
 
 
 
+#Regenerated vs controls
 
-#How does regeneration affect our molecular measure of age?
-
-
-Model built previously: random forest using all 50 markers
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-md <- as.data.frame(subset(t(ctall.norm), 
-                           (sik$sex == "F" &
-                              sik$over3 >= thresh&
-                 sik$exp %in% c("Size-age", "cohorts", "OvY", "regen") & 
-                 sik$type %in% c("O", "Y", "M", "OR", "MR", "YR")
-)) 
- #|    sik$type == "OR-A"
- )
-
-
-
-mymodel <- currbestgbm
-md <- md[, colnames(md) %in% mymodel$coefnames]
-
-
-
-md$rfagepred <- predict(mymodel, newdata= md)
-
-
-
-md$sample <- rownames(md)
-
-md <- left_join(md, sampleinfo, by="sample") %>%
-  filter(!(is.na(predage)))
-
-md$type <- as.character(md$type)
-md$type <- as.factor(case_when(
-  md$type %in% c("O", "M", "Y") ~ as.character(md$type), 
-  md$type %in% c("MR", "YR", "OR", "OR-A") ~"R"
-))
-
-
-md$regentime[is.na(md$regentime)] <- ""
-
-
-
-lm <- lm(rfagepred~predage, data=md)
- 
-#lm <- lm(rfagepred~predage, data=subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") ))
-                 
-md$lmresid <- lm$residuals
-md$lmressign <- md$lmresid >0
-
-md$regen <- ifelse(md$reg =="" , "unregenerated", "regenerated"         )
-
-
-
-
-
-(p=ggplot(md, aes(x=predage, y=rfagepred))+
-  geom_point(aes(colour=regen))+
-  xlab("Age (weeks) from body length") +
-  ylab("Age (weeks) from marker gene expression (random forest model)")+
-#  geom_line(aes(predage, lm
-#  geom_smooth(method="lm")+
-  geom_smooth(method="lm", colour="black", data=subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") ))+
-  theme_bw()+
- scale_colour_manual(values=c("forest green", "dark grey"), name="")+
-#  geom_text_repel(aes(label=sample,colour=regen), size=2.5)+
-  ggtitle("How does regeneration affect molecular age?", 
-          subtitle= paste0("one-sided t-test p-value on residuals of regenerated: ", round(tt$p.value,3))))
-
-#ggsave(plot=p, file="rejuvdet.pdf")
-```
-#Does regeneration rejuvenate?
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
@@ -123,95 +52,8 @@ md <- as.data.frame(subset(t(ctall.norm),
 
 
 mymodel <- currbestgbm
-md <- md[, colnames(md) %in% mymodel$coefnames]
 
-
-
-md$rfagepred <- predict(mymodel, newdata= md)
-
-
-
-md$sample <- rownames(md)
-
-md <- left_join(md, sampleinfo, by="sample") %>%
-  left_join(hkdat, by="sample") 
-
-
-
-
-
-md$group <- substr(md$sample, 1,1)
-md$ty <- substr(md$sample, 2,3)
-
-mdhk <-    select(md, over3, group, ty ) %>%
-  spread(value= over3, key=ty)
-
-colnames(mdhk)[2:4] <- paste0(colnames(mdhk)[2:4], "over")
-
-
-md2 <- select(md, rfagepred, group, ty) %>%
-  spread(value=rfagepred,key=ty) %>%
-  left_join(mdhk, by= "group")
-
-
-md2$control <- md2$un
-md2$control[md2$beover > md2$unover & !is.na(md2$beover)] <- md2$be[md2$beover > md2$unover & !is.na(md2$beover)]
-
-
-md2$dir <- md2$un > md2$re
-md2$diff <-  md2$re- md2$un
-md2$regn <- paste0(md2$group, "reg")
-
-md2 <- left_join(md2, select(sampleinfo, sample, predage), by=c("regn"= "sample"))
-
-
- #left_join(hkdat, sampleinfo, by="sample") %>%
- thresh <- 4
-
-
-md2$good <-  md2$unover >=thresh & md2$reover >=thresh
-
-
-ggplot(subset(md2, md2$good), aes(x=group, y=diff, fill=dir)) +
-  theme_bw()+
-  ylab("Rejuvenation Effect (weeks age difference)")+
-  xlab("Sample Group")+
-  geom_bar(stat="identity") +
-  scale_fill_manual(name="", 
-                    values=c("orangered", "forest green"), 
-                    labels=c("Aged", "Rejuvenated"))+
-  ggtitle("Rejuvenation Effect", 
-          subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used", "\nSamples with at least ", thresh, " housekeeping genes expressed in both  \np-value of t-test between regenerated and unamputated: ", 
-round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3))) 
-
-
-ggplot(subset(md2, md2$good), aes(x=group,y=0, yend=diff, fill=dir)) +
-  theme_bw()+
-  ylab("Rejuvenation Effect (weeks age difference)")+
-  xlab("Sample Group")+
-  geom_segment(stat="identity") +
-  scale_fill_manual(name="", 
-                    values=c("orangered", "forest green"), 
-                    labels=c("Aged", "Rejuvenated"))+
-  ggtitle("Rejuvenation Effect", 
-          subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used", "\nSamples with at least ", thresh, " housekeeping genes expressed in both  \np-value of t-test between regenerated and unamputated: ", 
-round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3))) 
-
-
-````
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-md <- as.data.frame(subset(t(ctall.norm), 
-                           (sampleinfo$sex == "F" &
-                 sampleinfo$exp %in% c("regen") & 
-                  sampleinfo$ctg > 5 &
-                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")
- )))
-
-
-
-mymodel <- rfagemodel
+mymodel <- rfagemodel61
 md <- md[, colnames(md) %in% mymodel$coefnames]
 
 
@@ -268,9 +110,13 @@ md2$good <- paste0(md2$group, "un") %in% qualsum$sample[qualsum$chistat < chithr
 
 #md2$good= <-  md2$unover >=thresh & md2$reover >=thresh
 
+limrange <- max(abs(md2$diff))
+
+
+round(wilcox.test(md2$un[md2$good], md2$re[md2$good])$p.value,3)
 
 ggplot(subset(md2, md2$good), aes(x=group, y=diff, fill=dir)) +
-  ylim(-12,12)+
+  ylim(-limrange, limrange)+
   theme_bw()+
   ylab("Rejuvenation Effect (weeks age difference)")+
   xlab("Sample Group")+
@@ -284,6 +130,7 @@ round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3)))
 
 ```
 
+#Regeneration effect visualised on aging time graph
 
 
 
@@ -333,29 +180,11 @@ reglist <- c(paste0(md2$group[md2$good], c("un")), paste0(md2$group[md2$good], c
 round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3))) )
 
 
-ggsave(plot=p, file="rejuveff.pdf", height=8, width=8)
+#ggsave(plot=p, file="rejuveff.pdf", height=8, width=8)
 ```
 
 
-
-
-There may be an overall trend! Lets look at this in more detail
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-ggplot(md, aes(x=predage, y=rfagepred))+
-  geom_point(aes(colour=reg))+
-  xlab("Age (weeks) from body length") +
-  ylab("Age (weeks) from marker gene expression (random forest model)")+
-  geom_smooth(method="lm", colour="black")+
-  theme_bw()+
- scale_colour_manual(values=c("grey", "forest green"), labels=c("Normal", "Regenerated"), name="")+
-#  geom_text_repel(aes(label=sample,colour=reg), size=2.5)
-  ggtitle("How does regeneration affect molecular age", subtitle= paste("model using 50 predictors (random forest)"))
-
-```
-
-
-
+#Regeneration time effect
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 #md$regentime <- as.numeric(md$regentime)
 #md$regentime[is.na(md$regentime)] 
@@ -373,420 +202,3 @@ p=ggplot(md, aes(x=regentime, y=lmresid, fill=regentime))+
 ggsave(plot=p, file="regtimeeff.pdf")
 
 ```
-
-It's significant!
-
-##Quality effect?
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
-                 sampleinfo$exp %in% c("regen") & 
-#                 sampleinfo$type %in% c("O", "OR", "OR-A", "YR", "MR" )& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
-
-
-
-mymodel <- currbest
-md <- md[, colnames(md) %in% mymodel$coefnames]
-
-
-md$rfagepred <- predict(mymodel, newdata= md)
-
-
-md$sample <- rownames(md)
-md$pair <- substr(md$sample,1,1)
-
-md <- left_join(md, sampleinfo, by="sample") %>%
-  filter(!(is.na(predage)))
-
-
-ggplot(md, aes(y=pair, x=rfagepred))+
-  geom_point(aes(colour=over10reads))+
-  xlab("pair") +
-  xlab("Age (weeks) from marker gene expression (random forest model)")+
-  scale_colour_gradient2(low="red2",mid="yellow",midpoint=70, high="forest green")+
-  theme_bw()+
-# scale_colour_manual(values=c("darkviolet", "cornflower blue", "forest green", "red3"))+
-  geom_text_repel(aes(label=sample,colour=over10reads), size=2.5)+
-  ggtitle("How does sample quality affect the visibility of a regeneration effect?")
-
-
-````
-
-
-
-#Nikos plot
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-md <- as.data.frame(ctallgood.norm)
-
-old <- t(subset(t(md), sampleinfo$type =="O" &  
-                  sampleinfo$sex == "F" & 
-                  sampleinfo$qual =="ok" &
-                  sampleinfo$ctg >2))
-
-young <- t(subset(t(md), sampleinfo$type =="Y" & 
-                    sampleinfo$sex== "F" & 
-                    sampleinfo$qual =="ok"&
-                    sampleinfo$ctg >2))
-
-#regen <- md[, sampleinfo$type == "OR"]
-
-regen <- t(subset(t(md), sampleinfo$type =="OR" &
-                    sampleinfo$over0reads >100 &
-                    sampleinfo$prep == "Luke"))
-
-
-vardat <- data.frame(
-  name= rownames(md), 
-  sname= substr(rownames(md), 1,2),
-  ROvOl2fc= foldchange2logratio(foldchange(rowMeans(regen), rowMeans(old))),
-  sROvOl2fc= round(foldchange2logratio(foldchange(rowMeans(regen), rowMeans(old))), 2),
-  YvOl2fc = foldchange2logratio(foldchange(rowMeans(young), rowMeans(old))), 
-  regencv = coefficient.variation(rowMeans(regen), apply(regen,1, sd))
-) %>%
-  mutate(ord = 1:length(sname))
-
-```
-
-
-Find the least variable markers: 
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-ggplot(data=vardat, aes(x=YvOl2fc, y=ROvOl2fc, label=sname, fill=regencv))+
-  geom_point(size=3, shape=21)+
-#  geom_label()+
-  geom_hline(yintercept=0, colour="black")+
-  geom_vline(xintercept=0, colour="black")+
-  theme_minimal()+
-  xlim(-6,+6)+
-  ylim(-6,6)+
-  xlab("Young vs Old Log2 Fold Change") +
-  ylab("Regenerated vs Old Log2 Fold Change")+
-#  scale_shape_manual(values=c(21,23), labels=c(">0.1", "<0.1"), breaks=c(FALSE, TRUE) ,name="RO vs O p-value" )+
-  scale_fill_gradient2(high="red3", mid="white", low="blue", midpoint=1, name="cv (regen)")+
-  geom_abline(inherit.aes=FALSE, intercept=0, slope=1, linetype=2)
-
-
-ggplot(data=vardat, aes(x=YvOl2fc, y=ROvOl2fc, label=sname, fill=regencv>1))+
-  geom_point(size=3, shape=21)+
-#  geom_label()+
-  geom_hline(yintercept=0, colour="black")+
-  geom_vline(xintercept=0, colour="black")+
-  theme_minimal()+
-  xlim(-6,+6)+
-  ylim(-6,6)+
-  xlab("Young vs Old Log2 Fold Change") +
-  ylab("Regenerated vs Old Log2 Fold Change")+
-#  scale_shape_manual(values=c(21,23), labels=c(">0.1", "<0.1"), breaks=c(FALSE, TRUE) ,name="RO vs O p-value" )+
-  scale_fill_manual(values=c("red3", "blue"))+
-  geom_abline(inherit.aes=FALSE, intercept=0, slope=1, linetype=2)+
-  ggtitle("Looking at least variable markers")
-
-```
-
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-md <- t(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
-  #              sampleinfo$qual == "ok"& 
-                 sampleinfo$exp %in% c("OvY", "Size-age", "cohorts", "regen") & 
-                 sampleinfo$ctg>2 & 
-                 sampleinfo$type %in% c("O",  "Y", "OR")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
-
-si <- subset(sampleinfo, sampleinfo$sample %in% colnames(md))
-
-
-
-nmd <- as.data.frame(md/rowMeans(md))
-
-vardat <- vardat %>% 
-  cbind( data.frame(oldmean = rowMeans(nmd[, si$type == "O"]), 
-                    youngmean = rowMeans(nmd[, si$type == "Y"]), 
-                    regmean = rowMeans(nmd[, si$type == "OR"]) )) %>%
-  left_join(select(geneinf,name, dir) , by="name")
-```
-
-#Effect by marker
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-#nmd$name <- rownames(md)
-nmd$sname <- substr(rownames(md), 1,2)
-
-
-
-nmd$di <- paste0(ifelse(nmd$dir == "upregulated with age", "up", "down"), ": ", nmd$sname)
-
-
-
-sl <- as.character(sampleinfo$sample[sampleinfo$sample %in% colnames(nmd)])
-
-mmd <- gather(as.data.frame(md), key="sample", value="expression", sl)
-
-nmd <- as.data.frame(nmd) %>%  left_join(vardat, by="sname") 
-
-
-nmd$sname <- factor(nmd$sname, levels=nmd$sname[order(nmd$ROvOl2fc)])
-
-
-
-mnmd <- nmd %>%  gather(key="sample", value="normexp", sl) %>%
-  left_join(sampleinfo, by= "sample") %>%
-  left_join(mmd, by="sample")
-
-
-
-ggplot(mnmd, aes(x= sname, y=normexp, colour=type))+
-  geom_point(alpha=0.1)+
-  stat_summary()+
-  theme_bw()+
-#  geom_boxplot(outlier.shape=NA)+
-  scale_y_continuous(trans="log2")+
-  facet_grid(~dir, space="free",scales="free" )+
-#  geom_boxplot(outlier.shape = NA)+
-  scale_colour_manual(values=c("cornflower blue", "forest green", "red3"))+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
-  ylab("Normalised Expression") +
-  xlab('Marker')+
-  geom_text(data=vardat,inherit.aes=F, aes(x=sname, y=20, label=sROvOl2fc), angle=60)+
-  ggtitle("Effect by marker", subtitle= "markers ordered by regen vs old l2fc")
-  
-ggplot(mnmd, aes(x= sname, y=normexp, fill=type))+
-#  geom_point(alpha=0.1)+
-#  stat_summary()+
-  theme_bw()+
-  geom_boxplot(outlier.shape=NA)+
-  scale_y_continuous(trans="log2")+
-  facet_grid(~dir, space="free",scales="free" )+
-#  geom_boxplot(outlier.shape = NA)+
-  scale_fill_manual(values=c("cornflower blue", "forest green", "red3"))+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
-  ylab("Normalised Expression") +
-  xlab('Marker')+
-  geom_text(data=vardat,inherit.aes=F, aes(x=sname, y=20, label=sROvOl2fc), angle=60)+
-  ggtitle("Effect by marker", subtitle= "markers ordered by regen vs old l2fc")
-
-````
- 
-#Pick only the less variable markers
-
-Take subset of markers: by low coefficient of variation amongst regenerated samples
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-ggplot(subset(mnmd, mnmd$regencv >1), aes(x= type, y=normexp, fill=type))+
-#  geom_point(alpha=0.1)+
-#  stat_summary()+
-  theme_bw()+
-  geom_violin(outlier.shape=NA)+
-  scale_y_continuous(trans="log2")+
-  facet_grid(~dir, space="free",scales="free" )+
-#  geom_boxplot(outlier.shape = NA)+
-  scale_fill_manual(values=c("cornflower blue", "forest green", "red3"))+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
-  ylab("Normalised Expression") +
-  xlab('Marker')+
-  ggtitle("Overall effect", subtitle ="markers with lower variability in regenerated samples")
-
-
-ggplot(subset(mnmd, mnmd$regencv >1), aes( x=normexp, fill=type))+
-#  geom_point(alpha=0.1)+
-#  stat_summary()+
-  theme_bw()+
-#  geom_boxplot(outlier.shape=NA)+
-  scale_x_continuous(trans="log2")+
-  facet_wrap(~sname+dir, scales="free" )+
-#  geom_boxplot(outlier.shape = NA)+
-  scale_fill_manual(values=c("cornflower blue", "forest green", "red3"))+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
-  xlab("Normalised Expression") +geom_density(alpha=0.5)+
-  theme(axis.text.x=element_blank(),axis.ticks=element_blank())+
-  ggtitle("Effect by marker", subtitle ="markers with lower variability in regenerated samples")
-
-
-mnmd$dir <- factor(mnmd$dir, levels= c("upregulated with age" ,"downregulated with age"))
-
-ggplot(subset(mnmd, mnmd$regencv >1), aes(x= sname, y=normexp, fill=type))+
-#  geom_point(alpha=0.1)+
-#  stat_summary()+
-  theme_bw()+
-  geom_boxplot(outlier.shape=NA)+
-  scale_y_continuous(trans="log2")+
-  facet_grid(~dir, space="free",scales="free" )+
-#  geom_boxplot(outlier.shape = NA)+
-  scale_fill_manual(values=c("cornflower blue", "forest green", "red3"))+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
-  ylab("Normalised Expression") +
-  xlab('Marker')+
-  ggtitle("Effect by marker", subtitle ="markers with lower variability in regenerated samples")
-
-
-
-````
-
-
-
-What if we take only the markers with the least variation and use those to look at how regen affects aging, as measured with the RF model? 
-
-#Regen Effect again
-##Molecular age using less variable markers
-
-Build a new age model, this one only using 14 markers, which are those with the lowest variability amongst regenerated samples. 
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-
-md <- as.data.frame(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
-  #              sampleinfo$qual == "ok"& 
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
- #                sampleinfo$ctg>2 & 
-                sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$type %in% c("O", "Y", "M")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
-
-md <- md[,colnames(md) %in% vardat$name[vardat$regencv>1]]
-
-md$sample <- rownames(md)
-md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
-  filter(!(is.na(predage))) %>%
-  column_to_rownames(var="sample")
-
-
-
-
-rfagemodel2 <- train(
-  predage~.,
-  tuneLength = 4,
-  data = md, method = "ranger",
-  trControl = trainControl(method = "cv", number = 5, verboseIter = F)
-)
-
-#print("random forest:")
-#rfagemodel2
-#plot(rfagemodel2)
-
-
-md$rfagepred <- predict(rfagemodel2)
-md <- md %>%
-  rownames_to_column(var="sample") %>%
-  left_join(select(sampleinfo, -predage), by="sample")
-
-
-acc <- lm(predage~rfagepred, md)
-
-
-ggplot(md, aes(x=predage, y=rfagepred))+
-  geom_point(aes(colour=type))+
-  xlab("Age (weeks) from body length") +
-  ylab("Age (weeks) from marker gene expression (random forest model)")+
-  geom_smooth(method="lm", colour="black")+
-  theme_bw()+
- scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
-  geom_text_repel(aes(label=sample,colour=type), size=2.5)+
-  ggtitle("Using Marker gene expression to predict age", subtitle=paste("R^2 of correlation between measure from length and from gene expression:", round(summary(acc)$r.squared, 3)))
-  
-````
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-md <- as.data.frame(subset(t(ctallgood.norm), sampleinfo$sex == "F" &
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY", "regen") & 
-                sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$qual != "bad"&
-                  sampleinfo$over10reads >70 &
-                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")& 
-  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
-
-
-md$rfagepred <- predict(rfagemodel2, newdata= md)
-
-
-
-
-md$sample <- rownames(md)
-
-md <- left_join(md, sampleinfo, by="sample") %>%
-  filter(!(is.na(predage)))
-
-md$type <- as.character(md$type)
-md$type <- as.factor(case_when(
-  md$type %in% c("O", "M", "Y") ~ as.character(md$type), 
-  md$type %in% c("MR", "YR", "OR") ~"R"
-))
-
-
-lm <- lm(rfagepred~predage, data=md)
-md$lmresid <- lm$residuals
-md$lmressign <- md$lmresid >0
-
-ggplot(md, aes(x=predage, y=rfagepred))+
-  geom_point(aes(colour=type))+
-  xlab("Age (weeks) from body length") +
-  ylab("Age (weeks) from marker gene expression (random forest model)")+
-  geom_smooth(method="lm", colour="black")+
-  theme_bw()+
- scale_colour_manual(values=c("darkviolet", "cornflower blue", "forest green", "red2"), name="")+
-  geom_text_repel(aes(label=sample,colour=type), size=2.5)+
-  ggtitle("How does regeneration affect molecular age?")
-```
-
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-ggplot(md, aes(x=predage, y=rfagepred))+
-  geom_point(aes(colour=reg))+
-  xlab("Age (weeks) from body length") +
-  ylab("Age (weeks) from marker gene expression (random forest model)")+
-  geom_smooth(method="lm", colour="black")+
-  theme_bw()+
- scale_colour_manual(values=c("grey", "forest green"), labels=c("Normal", "Regenerated"), name="Sample")+
-#  geom_text_repel(aes(label=sample,colour=reg), size=2.5)
-  ggtitle("How does regeneration affect molecular age", subtitle= "Model: 14 predictors, random forest")
-```
-
-#Test the significance of this effect
-
-
-One-way t-test if the residuals are significantly below 0. 
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-t.test(md$lmresid[md$reg =="R"] , alternative="less" )
-  
-
-````
-
-
-Pretty highly significant this time
-
-#What genes are these? 
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-
-myg <-  codeset %>%
-   subset(codeset$Customer_Identifier %in% vardat$name[vardat$regencv >1]) %>%
-   select(shortname, TopHit, DrosoTopHit)
-
-print("Arthropod hits")
-paste(myg$shortname, ":" ,myg$TopHit)
-
-
-print("Drosophila hits")
-paste(myg$shortname, ":" ,myg$DrosoTopHit)
-
-  
-
-````
-
-
-
