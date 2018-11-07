@@ -16,7 +16,7 @@ library(ggrepel)
 library(gtools)
 library(FinCal)
 library(ggrepel)
-library(e10)
+#library(e10)
 ````
 
 
@@ -53,7 +53,7 @@ md <- as.data.frame(subset(t(ctall.norm),
 
 mymodel <- currbestgbm
 
-mymodel <- rfagemodel61
+#mymodel <- rfagemodel61
 md <- md[, colnames(md) %in% mymodel$coefnames]
 
 
@@ -115,6 +115,9 @@ limrange <- max(abs(md2$diff))
 
 round(wilcox.test(md2$un[md2$good], md2$re[md2$good])$p.value,3)
 
+
+goodgroups <- subset(md2, md2$good)$group
+
 ggplot(subset(md2, md2$good), aes(x=group, y=diff, fill=dir)) +
   ylim(-limrange, limrange)+
   theme_bw()+
@@ -130,7 +133,18 @@ round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3)))
 
 ```
 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+goodgroups <- subset(md2, md2$good)$group
+save(goodgroups, file= "goodgroups.rdata")
+````
+
+
+
 #Regeneration effect visualised on aging time graph
+
 
 
 

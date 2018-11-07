@@ -17,6 +17,7 @@ library(ggrepel)
 library(gtools)
 library(FinCal)
 library(ggrepel)
+library(reshape2)
 #library(e10)
 ````
 
@@ -29,6 +30,8 @@ load(file="modelrf.rdata")
 load(file="modelgbm.rdata")
 load(file="hkdat.rdata")
 load(file="sampleinfo.rdata")
+
+load(file="goodgroups.rdata")
 
 
 ````
@@ -47,7 +50,7 @@ md <- as.data.frame(subset(t(ctall.norm),
 
 mymodel <- currbestgbm
 
-mymodel <- rfagemodel61
+#mymodel <- rfagemodel61
 md <- md[, colnames(md) %in% mymodel$coefnames]
 
 regs <- subset(md, substr(rownames(md),2,4) == "reg")
@@ -64,14 +67,43 @@ c <- ncol(regs)
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 m1 <- as.data.frame(round(matrix(runif(r*c), r, c)))
-rownames(m1) <- rownames(regs)
+rownames(m1) <- substr(rownames(regs),1,1)
 colnames(m1) <- colnames(regs)
 
 
 
 mm1 <- melt(rownames_to_column(m1))
 
+colnames(mm1) <- c("group", "marker", "choice")
+
+rownames(regs) <- substr(rownames(regs),1,1)
 mregs <- melt(rownames_to_column(regs))
+
+colnames(mregs) <- c("group", "marker", "value")
+mregs$choice <- 1
+
+rownames(uns) <- substr(rownames(uns),1,1)
+muns<- melt(rownames_to_column(uns))
+
+colnames(muns) <- c("group", "marker", "value")
+muns$choice <- 0
+
+
+a <- filter(left_join(mm1, mregs, by=c("group", "marker", "choice") ), !is.na(value))
+b <- filter(left_join(mm1, muns, by=c("group", "marker", "choice")), !is.na(value))
+mm1 <- arrange(rbind(a,b), group, marker)
+
+mm1 <- rbind( a, b )%>%
+  arrange(group, marker)
+
+sm1 <- spread(select(mm1, -choice), value="value", key="marker") #%>%
+#  column_to_rownames(var="group")
+
+
+
+sm1$agepred <- predict(mymodel, newdata= select(sm1, -group))
+
+mm1 <- left_join(mm1, select(sm1, group, agepred), by="group")
 
 ````
 
