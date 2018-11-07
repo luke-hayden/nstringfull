@@ -37,6 +37,7 @@ load(file="modelgbm.rdata")
 load(file="hkdat.rdata")
 load(file="sampleinfo.rdata")
 
+load(file="vardat.rdata")
 load(file="goodgroups.rdata")
 
 
@@ -45,7 +46,6 @@ load(file="goodgroups.rdata")
 
 
 #Classic modelling
-##Multiple Regression approach
 ####Simple linear regression: 
 
 **Age = X(marker1) + c**
@@ -72,7 +72,6 @@ Modelling approach that can capture the signal without simply reproducing all th
 
 To maximise predictive power
 
-##Approaches:
 
 ####Data partitioning: 
 
@@ -124,6 +123,8 @@ Resists overfitting
 
 Start with simple model (eg: mean of values in training dataset)
 
+Stepwise improvement (boosting) of this model by adding decision trees to progressively build a better model 
+
 #Random Forest parameters
 
 ntree: number of trees
@@ -136,7 +137,28 @@ cross-validation folds: number of repartitions of data for testing
 
 splitting model: variance or "extratrees"
 
+#GBM parameters
 
+number of iterations, i.e. trees, (called n.trees in the gbm function)
+
+complexity of the tree, called interaction.depth
+
+learning rate: how quickly the algorithm adapts, called shrinkage
+
+the minimum number of training set samples in a node to commence splitting (n.minobsinnode)
+
+
+#Model tuning
+
+Trying to manually tune every parameter by building huge numbers of real models is extremely tiresome 
+
+##Caret
+
+R package to allow optimisation of tuning parameters for model building
+
+Can provide a tuning grid with a range of parameters to be tested
+
+Small models are built with all possible combinations of these parameters, then final model built under best-performing parameter set
 
 
 
@@ -154,5 +176,359 @@ Examine the effect of regeneration on the molecular age profile of *Parhyale* li
 -195 genes chosen on the basis of differential expression analysis 
 
 -5 control genes: do not vary in expression between conditions
+
+
+#Young vs old separation: PCA old vs young
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+log <- sampleinfo$reg == "" & 
+  !(sampleinfo$age %in% c("N")) & 
+  sampleinfo$sex == "F"&
+  sampleinfo$exp %in% c("OvY", "Size-age") & 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8")) &
+ sampleinfo$over10reads > 100 &
+  sampleinfo$ctg > 2 &
+  sampleinfo$prep == "Luke"
+
+bcmin <- as.matrix(ctallgood.norm[,log== TRUE])
+bcmin.groups <- subset(sampleinfo$type, log==TRUE)
+
+tbc <- as.matrix(t(bcmin))
+
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+ggtitle("PCA of Old vs Young (females): 50 chosen markers")+
+    theme_bw() +
+#  scale_colour_manual(values=c("cornflower blue", "red3", "black"))+
+  theme(plot.title=element_text(size=8,face="bold"))+
+#  geom_label(label=rownames(tbc), aes(colour=bc.groups))+
+  scale_colour_manual(values= c("darkviolet","cornflower blue",  "red2"))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
+
+
+````
+
+#Young vs old separation: Old vs young by marker
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- t(subset(t(ctall.norm), sampleinfo$sex == "F" &
+  #              sampleinfo$qual == "ok"& 
+                 sampleinfo$exp %in% c("OvY", "Size-age", "cohorts") & 
+                 sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+si <- subset(sampleinfo, sampleinfo$sample %in% colnames(md))
+old <- t(subset(t(md), si$age == "O"))
+young <- t(subset(t(md), si$age == "Y"))
+#regen <- t(subset(t(ctg1to9), sampleinfo$type == "OR" & sampleinfo$qual != "bad"))
+
+
+
+
+
+nmd <- as.data.frame(md/rowMeans(md))
+
+
+ns <- colnames(md)
+
+nmd$name <- rownames(md)
+nmd$sname <- substr(nmd$name, 1,2)
+
+oy <- cbind(old, young)
+t.result <-  apply(oy, 1, function (x) t.test(x[1:ncol(old)],x[ncol(old)+1: ncol(oy)]))
+
+
+
+nmd$p_value <- unlist(lapply(t.result, function(x) x$p.value))
+
+nmd <- left_join(nmd, geneinf, by="name")
+
+
+
+
+
+
+nmd$YvOl2fc <- foldchange2logratio(foldchange(rowMeans(young), rowMeans(old)))
+
+
+nmd$sname <- factor(nmd$sname, levels=nmd$sname[order(nmd$YvOl2fc)])
+nmd$good <- nmd$p_value <0.05
+nmd$di <- paste0(ifelse(nmd$dir == "upregulated with age", "up", "down"), ": ", nmd$sname)
+
+
+sl <- as.character(sampleinfo$sample[sampleinfo$sample %in% colnames(nmd)])
+
+mmd <- gather(as.data.frame(md), key="sample", value="expression", sl)
+
+mnmd <- gather(nmd, key="sample", value="normexp", sl) %>%
+  left_join(sampleinfo, by= "sample") %>%
+  left_join(mmd, by="sample")
+
+
+ggplot(mnmd, aes(x= sname, y=normexp, colour=type))+
+#  geom_point()+
+  theme_bw()+
+  geom_boxplot(outlier.shape=NA)+
+  scale_y_continuous(trans="log2")+
+  facet_grid(~dir, space="free",scales="free" )+
+#  geom_boxplot(outlier.shape = NA)+
+  scale_colour_manual(values=c("darkviolet", "cornflower blue", "red3"))+
+  scale_fill_manual(values=c("darkviolet", "cornflower blue", "red3"))+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  ylab("Normalised Expression") +
+  xlab('Marker')+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
+  
+
+
+````
+
+#Expression/length relationship
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+  #              sampleinfo$qual == "ok"& 
+#                 sampleinfo$exp %in% c("OvY", "Size-age", "cohorts") & 
+                 sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")))
+ # !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+
+
+markerlist <- colnames(md)
+
+md$sample <- rownames(md)
+
+
+md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
+  filter(!(is.na(predage))) %>%
+  column_to_rownames(var="sample")
+
+
+
+lmlist <- list()
+arsqlist <- list()
+rselist <- list()
+plist <- list()
+rmselist <- list()
+
+
+for (i in 1:length(markerlist)){
+  ilm <- lm(as.formula(paste0("predage~", markerlist[i])), md)
+  lmlist[i] <- ilm
+  arsqlist[i]<- summary(ilm)$adj.r.squared
+  rmselist[i] <- sqrt(sum(residuals(ilm)^2) / df.residual(ilm))
+  
+  
+}
+
+
+lmdf <- data.frame(name =markerlist, rsq=unlist(arsqlist), rmse=unlist(rmselist)) %>%
+  left_join(geneinf, by="name")
+
+
+lmdf$sname <- substr(lmdf$name, 1,2)
+lmdf$sname <- factor(lmdf$sname, levels=lmdf$sname[order(lmdf$rsq)])
+
+
+md <- t(subset(t(ctall.norm), sampleinfo$sex == "F" &
+               sampleinfo$qual == "ok"& 
+ #                sampleinfo$exp %in% c("OvY", "Size-age", "cohorts") & 
+                 sampleinfo$ctg>2 & 
+   sampleinfo$ctg <5 &
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")&
+ !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))
+  
+  
+  ))
+
+si <- subset(sampleinfo, sampleinfo$sample %in% colnames(md))
+old <- t(subset(t(md), si$age == "O"))
+young <- t(subset(t(md), si$age == "Y"))
+#regen <- t(subset(t(ctg1to9), sampleinfo$type == "OR" & sampleinfo$qual != "bad"))
+
+
+
+oy <- cbind(old, young)
+t.result <-  apply(oy, 1, function (x) t.test(x[1:ncol(old)],x[ncol(old)+1: ncol(oy)]))
+
+
+pvals <- data.frame(name=rownames(md), pvalovy = unlist(lapply(t.result, function(x) x$p.value)))
+
+
+
+lmdf2 <- left_join(lmdf, pvals, by="name")
+
+
+
+mnmd <- gather(nmd, key="sample", value="normexp", ns)
+
+
+mnmd <- left_join(mnmd, sampleinfo, by="sample")
+
+mnmd<- subset(mnmd, (!is.na(predage))) %>%
+  left_join(select(minf, sname, chosenand), by="sname") %>%
+  left_join(select(lmdf2, name, rsq, rmse, pvalovy), by="name")
+
+mnmd$grsq <- mnmd$rsq > 0.06
+
+mnmd$ca <- ifelse(mnmd$chosenand == T, "amongst chosen 50", "not amongst chosen 50")
+
+ggplot(mnmd, aes(x=predage, y=normexp))+
+#  geom_point(shape=21, aes(fill=type))+
+#  geom_text(aes(label=sample, colour=type))+
+   geom_smooth(method="lm", se=F, aes(size=sname, colour=grsq),alpha=0.3,linetype=1)+
+  scale_size_manual(values=rep(0.5,195), guide=F)+
+  theme_bw()+
+#scale_y_continuous(trans="log2")+
+ scale_fill_manual(values=c("darkviolet", "cornflower blue", "red3"))+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  ylab("Normalised Expression") +
+#  xlab('pre')+
+  facet_grid(dir~ca)+
+  scale_colour_manual(values=c("grey", "forest green"))+
+  xlab("Sample age")+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
+```
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"&
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+ #                sampleinfo$ctg>2 &
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")
+))
+
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
+
+md$sample <- rownames(md)
+
+md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
+  filter(!(is.na(predage))) %>%
+  column_to_rownames(var="sample")
+
+trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
+
+
+trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+trdat <- md[trainchoice,]
+tedat <-   md[!(rownames(md) %in% rownames(trdat)),]
+
+
+
+nocvrfmodel <- train(
+  predage~.,
+  tuneLength = 4,
+  metric="RMSE",
+  num.trees=200,
+  importance = "permutation",
+  data = trdat, method = "ranger",
+  tuneGrid=expand.grid(mtry=c(10:20),
+                        splitrule=c("extratrees", "variance"),
+                        min.node.size=c(1:10))#,
+#  trControl = trainControl(method = "cv", number = 40, verboseIter = T)
+)
+````
+#Tuning parameters for a random forest
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+plot(nocvrfmodel)
+#rfagemodel$trainingData
+#summary(currbest$finalModel)
+````
+
+
+
+#Model accuracy: age from body length regression
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+mymodel <- nocvrfmodel
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"&
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+ #                sampleinfo$ctg>2 &
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")
+))
+
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+
+md$rfagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample")
+
+md <- subset(md, !(is.na(md$predage)))
+
+
+RMSEtr <- sqrt(mean( (md$rfagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+
+
+
+
+
+RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+(p=ggplot(md, aes(x=predage, y=rfagepred,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression (random forest model)")+
+  geom_smooth(method="lm", colour="black")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("RMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3))))#+  facet_wrap(~intrain)
+
+
+#ggsave(plot=p,height=5,width=6,dpi=200, filename=paste("modeltrte.pdf"), useDingbats=FALSE, limitsize = FALSE)
+
+
+```
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+
+````
 
 

@@ -12,40 +12,16 @@ slide_level: 3
 
 
 
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-library(dplyr)
-library(ggbiplot)
-library(tibble)
-library(tidyr)
-library(caret)
-library(RColorBrewer)
-library(ggrepel)
-library(gtools)
-library(FinCal)
-library(ggrepel)
-library(reshape2)
-#library(e10)
-````
-
-
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-#setwd("~/Documents/nstringjul18/nstringfull")
-load(file="allns_data.rdata")
-load(file="modelrf.rdata")
-load(file="modelgbm.rdata")
-load(file="hkdat.rdata")
-load(file="sampleinfo.rdata")
-
-load(file="goodgroups.rdata")
-
-
-````
 
 
 
 
-#Multiple Regression approach
+
+
+
+
+#Classic modelling
+##Multiple Regression approach
 ####Simple linear regression: 
 
 **Age = X(marker1) + c**
@@ -68,10 +44,47 @@ Where we have many different markers, we can find values of x,y,z,w, etc that so
 
 ##We want: 
 
+Modelling approach that can capture the signal without simply reproducing all the noise present in our dataset
+
+To maximise predictive power
+
+##Approaches:
+
+####Data partitioning: 
+
+train-test split
+
+cross-validation)
+
+####Model type
+
+Ensemble methods!
+
+####Model parameters
+
+Exploring parameter space
 
 
+#Machine Learning terminology
 
-#Random Forest approach
+##Supervised vs unsupervised learning
+
+Unsupervised learning: find the shape of the data (
+
+(eg: PCA, kmeans clustering)
+
+Supervised learning: train an algorithm to recapitulate the examples it sees in a dataset
+
+(eg: linear regression)
+
+##Classification vs Regression
+
+Classification: categorise examples into one of a number of discrete categories
+
+Regression: determine value along range
+
+
+#Tree ensemble approaches
 
 ###Decision tree
 
@@ -79,16 +92,31 @@ Classify or perform regression by asking binary questions of data: whether value
 
 ###Random Forest
 
-Ensemble of decision trees, each using a random subset of the predictors
+Ensemble of decision trees, each using a random subset of the predictors to classify/perform regression on a random subset of the data
 
 Resists overfitting
 
+###Gradient Boosting Machine
+
+Start with simple model (eg: mean of values in training dataset)
+
+#Random Forest parameters
+
+ntree: number of trees
+
+mtry: Number of variables randomly sampled as candidates at each split
+
+min.node.size: sets depth of trees
+
+cross-validation folds: number of repartitions of data for testing 
+
+splitting model: variance or "extratrees"
 
 
 
 
 
-#Background
+#My project as example
 ##Project
 
 Examine the effect of regeneration on the molecular age profile of *Parhyale* limbs
