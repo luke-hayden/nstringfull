@@ -35,8 +35,9 @@ load(file="sampleinfo.rdata")
 load(file="vardat.rdata")
 load(file="models.rdata")
 
+load(file="progmodels.rdata")
 load(file="qualitydat.rdata")
-
+load(file="markerchoiceinfo.rdata")
 
 ````
 
@@ -121,7 +122,7 @@ rfagemodel61 <- train(
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 mymodel <- rfagemodel61
-#mymodel <- rfagemodel
+#mymodel <- currbest
 
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
@@ -380,7 +381,7 @@ mymodel$coefnames
 Variable importance obtained via permutation 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-mymodel <- currbest
+mymodel <- rfagemodel61
 
 vrimprf <-varImp(mymodel)$importance %>%
   rownames_to_column(var="name")
@@ -397,7 +398,7 @@ vrimprf$sname <- factor(vrimprf$sname, levels=vrimprf$sname[order(vrimprf$Overal
   ggtitle("Marker contributions", subtitle= paste0("random forest model built with ", length(mymodel$coefnames), " markers"))
 )
 
-ggsave(plot=p,height=5,width=5,dpi=200, filename=paste("contribs.pdf"), useDingbats=FALSE, limitsize = FALSE)
+ggsave(plot=p,height=5,width=5,dpi=200, filename=paste("contribs61.pdf"), useDingbats=FALSE, limitsize = FALSE)
 ````
 
 
@@ -453,7 +454,7 @@ md$lab <- factor(md$lab, levels=unique(md$lab[order(md$Overall, decreasing=T)]))
 
 
 
-ggsave(plot=p,height=18,width=6,dpi=200, filename=paste("contribprofiles.pdf"), useDingbats=FALSE, limitsize = FALSE)
+ggsave(plot=p,height=18,width=6,dpi=200, filename=paste("contribprofiles61.pdf"), useDingbats=FALSE, limitsize = FALSE)
 
 
 

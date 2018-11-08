@@ -30,7 +30,6 @@ load(file="modelrf.rdata")
 load(file="modelgbm.rdata")
 load(file="hkdat.rdata")
 load(file="sampleinfo.rdata")
-
 load(file="goodgroups.rdata")
 
 
@@ -67,6 +66,10 @@ c <- ncol(regs)
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 m1 <- as.data.frame(round(matrix(runif(r*c), r, c)))
+
+
+m1 <- as.data.frame(round(matrix(runif(1*c), 1, c)))
+
 rownames(m1) <- substr(rownames(regs),1,1)
 colnames(m1) <- colnames(regs)
 

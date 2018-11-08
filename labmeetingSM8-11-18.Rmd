@@ -1,7 +1,7 @@
 ---
-title: "Putting the CART before the horse"
+title: "Ammene ton CARTable!"
 author: "Luke Hayden"
-date: 26th September 2018
+date: "8 Novembre 2018"
 output:
   beamer_presentation:
     theme: "Darmstadt"
@@ -13,7 +13,7 @@ slide_level: 3
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-library(dplyr)
+library(reshape2)
 library(ggbiplot)
 library(tibble)
 library(tidyr)
@@ -23,7 +23,8 @@ library(ggrepel)
 library(gtools)
 library(FinCal)
 library(ggrepel)
-library(reshape2)
+
+library(dplyr)
 #library(e10)
 ````
 
@@ -36,9 +37,13 @@ load(file="modelrf.rdata")
 load(file="modelgbm.rdata")
 load(file="hkdat.rdata")
 load(file="sampleinfo.rdata")
-
+load(file="qualitydat.rdata")
 load(file="vardat.rdata")
 load(file="goodgroups.rdata")
+load(file="markerchoiceinfo.rdata")
+
+load(file="progmodels.rdata")
+load(file="rfagemodelbadcv.rdata")
 
 
 ````
@@ -107,7 +112,7 @@ Classification: categorise examples into one of a number of discrete categories
 Regression: determine value along range
 
 
-#Tree ensemble approaches
+#Classification and Regression Trees
 
 ###Decision tree
 
@@ -412,7 +417,12 @@ ggplot(mnmd, aes(x=predage, y=normexp))+
 
 
 
+
+
+#Initial attempts
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+mymodel <- rfagemodel
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
@@ -424,51 +434,58 @@ md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 ))
 
 md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
-md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
+md <- subset(md, rownames(md) %in% rownames(mymodel$trainingData))
 
-md$sample <- rownames(md)
-
-md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
-  filter(!(is.na(predage))) %>%
-  column_to_rownames(var="sample")
-
-trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
-
-
-trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
-trdat <- md[trainchoice,]
-tedat <-   md[!(rownames(md) %in% rownames(trdat)),]
+md <- md[,colnames(md) %in% mymodel$coefnames]
 
 
 
-nocvrfmodel <- train(
-  predage~.,
-  tuneLength = 4,
-  metric="RMSE",
-  num.trees=200,
-  importance = "permutation",
-  data = trdat, method = "ranger",
-  tuneGrid=expand.grid(mtry=c(10:20),
-                        splitrule=c("extratrees", "variance"),
-                        min.node.size=c(1:10))#,
-#  trControl = trainControl(method = "cv", number = 40, verboseIter = T)
-)
-````
-#Tuning parameters for a random forest
+md$rfagepred <- predict(mymodel, newdata=md)
 
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample")
+
+md <- subset(md, !(is.na(md$predage)))
+
+
+RMSEtr <- sqrt(mean( (md$rfagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+
+
+
+
+
+RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+(p=ggplot(md, aes(x=predage, y=rfagepred,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression (random forest model)")+
+  geom_smooth(method="lm", colour="black")+
+  theme_bw()+
+ scale_colour_manual(values=c("red3"), name="Data partition", labels=c("Training"))+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("RMSE in training data: ", round(RMSEtr,3), 
+                          "")))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )#+  facet_wrap(~intrain)
+
+
+#ggsave(plot=p,height=5,width=6,dpi=200, filename=paste("modeltrte.pdf"), useDingbats=FALSE, limitsize = FALSE)
+
+
+```
+
+#But.......
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-plot(nocvrfmodel)
-#rfagemodel$trainingData
-#summary(currbest$finalModel)
-````
-
-
-
-#Model accuracy: age from body length regression
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-mymodel <- nocvrfmodel
-
+mymodel <- trterfagemodel
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
                  sampleinfo$prep== "Luke"&
@@ -479,6 +496,7 @@ md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 ))
 
 md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+#md <- subset(md, rownames(md) %in% rownames(mymodel$trainingData))
 
 md <- md[,colnames(md) %in% mymodel$coefnames]
 
@@ -515,16 +533,12 @@ RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F
  scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
   geom_text_repel(aes(label=sample), size=2.5)+
   ggtitle("Using Marker gene expression to predict age", 
-          subtitle=paste0("RMSE in training data: ", round(RMSEtr,3), 
-                          "\nRMSE in test data: ", round(RMSEte,3))))#+  facet_wrap(~intrain)
-
-
-#ggsave(plot=p,height=5,width=6,dpi=200, filename=paste("modeltrte.pdf"), useDingbats=FALSE, limitsize = FALSE)
-
-
-```
-
-```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+          subtitle=paste0(length(mymodel$coefnames), 
+            " markers in model \nRMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3))))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )#+  facet_wrap(~intrain)
 
 
 
@@ -532,3 +546,561 @@ RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F
 ````
 
 
+#40-fold cross-validation
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+mymodel <- rfagemodel61
+mymodel <- currbest
+
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+                 sampleinfo$ctg>2 &
+                 sampleinfo$type %in% c("O", "Y", "M") 
+)
+)
+md <- md[, lmdf2$in61 ==T]
+
+
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+
+md$rfagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample")
+
+md <- subset(md, !(is.na(md$predage)))
+
+
+RMSEtr <- sqrt(mean( (md$rfagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+
+(p=ggplot(md, aes(x=predage, y=rfagepred,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression (random forest model)")+
+  geom_smooth(method="lm", colour="black")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0(length(mymodel$coefnames), 
+            " markers in model \nRMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3))))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent"))#+  facet_wrap(~intrain)
+
+
+
+
+
+#Tuning parameters for a random forest
+````
+
+#Tuning model parameters
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+plot(currbest)
+#rfagemodel$trainingData
+#summary(currbest$finalModel)
+````
+
+#Contributions to model
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+mymodel <- currbest
+
+vrimprf <-varImp(mymodel)$importance %>%
+  rownames_to_column(var="name")
+vrimprf$sname <- substr(vrimprf$name, 1,2)
+
+vrimprf$sname <- factor(vrimprf$sname, levels=vrimprf$sname[order(vrimprf$Overall, decreasing=T)])
+
+(p=ggplot(vrimprf, aes(x=sname, y=Overall))+
+  theme_bw()+
+  geom_bar(stat="identity", fill="red3")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  xlab("Marker")+
+  ylab("Contribution to model")+
+  ggtitle("Marker contributions", subtitle= paste0("random forest model built with ", length(mymodel$coefnames), " markers"))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent"))
+)
+
+#ggsave(plot=p,height=5,width=5,dpi=200, filename=paste("contribs.pdf"), useDingbats=FALSE, limitsize = FALSE)
+````
+
+
+#Marker profiles
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.height = 12}
+
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"& 
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+md <- subset(md, rownames(md) %in% sampleinfo$sample[!is.na(sampleinfo$predage)])
+
+md <-  as.data.frame(md/rowMeans(md))
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample") %>%
+  gather(key=marker, value= exp, mymodel$coefnames)%>%
+  left_join(minf, by=c("marker"="name"))%>%
+  left_join(select(vrimprf, -sname), by= c("marker"="name"))
+
+md$lab <- paste0(md$sname, ": ", round(md$Overall,3))
+
+
+md$lab <- factor(md$lab, levels=unique(md$lab[order(md$Overall, decreasing=T)]))
+
+(p=ggplot(md, aes(x=predage, y= exp, colour=dir))+
+  geom_smooth()+
+  geom_point(size=0.5)+
+  theme_bw()+
+  facet_wrap(~lab, scales="free", ncol=7)+
+  scale_colour_brewer(palette="Set1")+
+  xlab("Age (based on body length)")+
+  ylab("Normalised expression")+
+  theme(legend.direction = 'horizontal', legend.position = 'bottom')+
+ 
+  ggtitle("Marker profiles", subtitle= paste0("markers from random forest model built with ", length(mymodel$coefnames), " markers")) +
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent")))
+
+
+
+#ggsave(plot=p,height=18,width=6,dpi=200, filename=paste("contribprofiles.pdf"), useDingbats=FALSE, limitsize = FALSE)
+
+
+
+````
+
+It looks like some optimisation on the basis of these profiles may furhter improve the model's fit. 
+
+
+
+#GBM
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+mymodel <- rfagemodel61
+mymodel <- currbestgbm
+
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+                 sampleinfo$ctg>2 &
+                 sampleinfo$type %in% c("O", "Y", "M") 
+)
+)
+md <- md[, lmdf2$in61 ==T]
+
+
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+
+md$rfagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample")
+
+md <- subset(md, !(is.na(md$predage)))
+
+
+RMSEtr <- sqrt(mean( (md$rfagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+
+ggplot(md, aes(x=predage, y=rfagepred,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression (random forest model)")+
+  geom_smooth(method="lm", colour="black")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0(length(mymodel$coefnames), 
+            " markers in model \nRMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3)))+
+  theme(plot.background = element_rect(fill = "transparent",colour = "transparent"))#+  facet_wrap(~intrain)
+
+
+
+
+
+#Tuning parameters for a random forest
+````
+
+#Marker contributions
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.show = 'hide'}
+
+
+mymodel <- currbestgbm
+vrimpgbm <- summary(mymodel)
+
+````
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+vrimpgbm$sname <- substr(vrimpgbm$var,1,2)
+vrimpgbm$sname <- factor(vrimpgbm$sname, levels=vrimpgbm$sname[order(vrimpgbm$rel.inf, decreasing=T)])
+
+ggplot(vrimpgbm, aes(x=sname, y=rel.inf))+
+  theme_bw()+
+  geom_bar(stat="identity", fill="red3")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  xlab("Marker")+
+  ylab("Contribution to model")+
+  ggtitle("Marker contributions", subtitle= paste0("GBM model built with ", length(mymodel$coefnames), " markers"))+
+  theme(plot.background = element_rect(fill = "transparent",colour = "transparent"))
+
+
+````
+
+#Marker contributions and profiles
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.height = 12}
+
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"& 
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+md <- subset(md, rownames(md) %in% sampleinfo$sample[!is.na(sampleinfo$predage)])
+
+md <-  as.data.frame(md/rowMeans(md))
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample") %>%
+  gather(key=marker, value= exp, mymodel$coefnames)%>%
+  left_join(minf, by=c("marker"="name"))%>%
+  left_join(select(vrimpgbm, -sname), by= c("marker"="var"))
+
+md$lab <- paste0(md$sname, ": ", round(md$rel.inf,3))
+
+
+md$lab <- factor(md$lab, levels=unique(md$lab[order(md$rel.inf, decreasing=T)]))
+
+(p=ggplot(md, aes(x=predage, y= exp, colour=dir))+
+  geom_smooth()+
+  geom_point(size=0.5)+
+  theme_bw()+
+  facet_wrap(~lab, scales="free", ncol=7)+
+  scale_colour_brewer(palette="Set1")+
+  xlab("Age (based on body length)")+
+  ylab("Normalised expression")+
+  theme(legend.direction = 'horizontal', legend.position = 'bottom')+
+ 
+  ggtitle("Marker profiles", subtitle= paste0("markers from random forest model built with ", length(mymodel$coefnames), " markers")) +
+  theme(plot.background = element_rect(fill = "transparent",colour = "transparent")))
+
+
+
+
+
+#ggsave(plot=p,height=18,width=6,dpi=200, filename=paste("gbmcontribprofiles.pdf"), useDingbats=FALSE, limitsize = FALSE)
+
+
+```
+
+
+#GBM vs Random Forest
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+vrimp <- left_join(vrimpgbm, vrimprf, by="sname")
+
+ggplot(vrimp, aes(x=rel.inf,y=Overall, label=sname))+
+  theme_bw()+
+  ylab("Random Forest importance")+
+  xlab("GBM relative influence")+
+  scale_y_continuous(trans="log2")+
+  scale_x_continuous(trans="log2")+
+#  scale_y_log10()+
+#  scale_x_log10()+
+  geom_point(size=3, colour="red2")+
+  geom_text_repel()+
+  ggtitle("Marker importance: GBM vs Random Forest", subtitle= paste0("Same ", length(mymodel$coefnames), " markers"))+
+  theme(plot.background = element_rect(fill = "transparent",colour = "transparent"))
+
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctall.norm), 
+                           (sampleinfo$sex == "F" &
+                 sampleinfo$exp %in% c("regen") & 
+                  sampleinfo$ctg > 5 &
+                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")
+ )))
+
+
+
+mymodel <- currbestgbm
+
+mymodel <- rfagemodel61
+md <- md[, colnames(md) %in% mymodel$coefnames]
+
+
+
+md$rfagepred <- predict(mymodel, newdata= md)
+
+
+
+md$sample <- rownames(md)
+
+md <- left_join(md, sampleinfo, by="sample") %>%
+  left_join(hkdat, by="sample") 
+
+
+
+
+
+md$group <- substr(md$sample, 1,1)
+md$ty <- substr(md$sample, 2,3)
+
+mdhk <-    select(md, over10, group, ty ) %>%
+  spread(value= over10, key=ty)
+
+colnames(mdhk)[2:4] <- paste0(colnames(mdhk)[2:4], "over")
+
+
+md2 <- select(md, rfagepred, group, ty) %>%
+  spread(value=rfagepred,key=ty) %>%
+  left_join(mdhk, by= "group")
+
+
+md2$control <- md2$un
+md2$control[md2$beover > md2$unover & !is.na(md2$beover)] <- md2$be[md2$beover > md2$unover & !is.na(md2$beover)]
+
+
+md2$dir <- md2$un > md2$re
+md2$diff <-  md2$re- md2$un
+md2$regn <- paste0(md2$group, "reg")
+
+md2 <- left_join(md2, select(sampleinfo, sample, predage), by=c("regn"= "sample")) 
+
+
+ #left_join(hkdat, sampleinfo, by="sample") %>%
+atleast <-10
+ overthresh <- 1
+ chithresh <- 500
+
+ 
+ 
+md2$good <- paste0(md2$group, "un") %in% qualsum$sample[qualsum$chistat < chithresh] &
+            paste0(md2$group, "un") %in% qualsum$sample[qualsum$over10 >= overthresh] &
+            paste0(md2$group, "reg") %in% qualsum$sample[qualsum$chistat < chithresh] &
+            paste0(md2$group, "reg") %in% qualsum$sample[qualsum$over10 >= overthresh] 
+
+#md2$good= <-  md2$unover >=thresh & md2$reover >=thresh
+
+limrange <- max(abs(md2$diff))
+
+
+````
+
+#Does regeneration rejuvenate?
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+sik <- left_join(sampleinfo, hkdat, by="sample")
+md <- as.data.frame(subset(t(ctall.norm), 
+                           (sik$sex == "F" &
+                            
+                 sik$exp %in% c("Size-age", "cohorts", "OvY", "regen") & 
+                 sik$type %in% c("O", "Y", "M", "OR", "MR", "YR")
+                 &                 !  sik$sample %in% c("AF", "AG")
+)) 
+ )
+
+md <- subset(md, rownames(md) %in% qualsum$sample[qualsum$good])
+
+
+mymodel <- currbestgbm
+md <- md[, colnames(md) %in% mymodel$coefnames]
+md$rfagepred <- predict(mymodel, newdata= md)
+
+md$sample <- rownames(md)
+
+md <- left_join(md, sik, by="sample") %>%
+  filter(!(is.na(predage)))
+
+lm <- lm(rfagepred~predage, data=md)
+ 
+reglist <- c(paste0(md2$group[md2$good], c("un")), paste0(md2$group[md2$good], c("reg")))
+
+
+ggplot(md, aes(x=predage, y=rfagepred))+
+  geom_point(colour="grey")+
+  xlab("Age (weeks) from body length") +
+  ylab(paste0("Age (weeks) from marker gene expression (", toupper(mymodel$method), ")"))+
+  geom_smooth(method="lm", colour="black", data=subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") ))+
+  theme_bw()+
+  geom_segment(data=subset(md2, md2$good), aes(x=predage, xend=predage, y=un, yend=re, colour=dir),alpha=1, size=1.5, 
+               arrow= arrow(length=unit(0.30,"cm"), ends="last", type = "open"))+
+ # geom_text_repel(data=subset(md, md$sample %in% reglist), aes(label=sample))+
+  scale_colour_manual(name="", 
+                    values=c("orangered", "forest green"), 
+                    labels=c("Aged", "Rejuvenated"))+
+
+  ggtitle("Rejuvenation Effect", 
+          subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used", "\nSamples with at least ", overthresh, " housekeeping genes with at least ",atleast, " reads\nChi-stat < ", chithresh, "\np-value of t-test between regenerated and unamputated: ", 
+round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3))) +
+  theme(plot.background = element_rect(fill = "transparent",colour = "transparent"))
+
+
+#ggsave(plot=p, file="rejuveff.pdf", height=8, width=8)
+```
+
+
+
+#Does regeneration rejuvenate?
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctall.norm), 
+                           (sampleinfo$sex == "F" &
+                 sampleinfo$exp %in% c("regen") & 
+                  sampleinfo$ctg > 5 &
+                 sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")
+ )))
+
+
+
+mymodel <- currbestgbm
+
+mymodel <- rfagemodel61
+md <- md[, colnames(md) %in% mymodel$coefnames]
+
+
+
+md$rfagepred <- predict(mymodel, newdata= md)
+
+
+
+md$sample <- rownames(md)
+
+md <- left_join(md, sampleinfo, by="sample") %>%
+  left_join(hkdat, by="sample") 
+
+
+
+
+
+md$group <- substr(md$sample, 1,1)
+md$ty <- substr(md$sample, 2,3)
+
+mdhk <-    select(md, over10, group, ty ) %>%
+  spread(value= over10, key=ty)
+
+colnames(mdhk)[2:4] <- paste0(colnames(mdhk)[2:4], "over")
+
+
+md2 <- select(md, rfagepred, group, ty) %>%
+  spread(value=rfagepred,key=ty) %>%
+  left_join(mdhk, by= "group")
+
+
+md2$control <- md2$un
+md2$control[md2$beover > md2$unover & !is.na(md2$beover)] <- md2$be[md2$beover > md2$unover & !is.na(md2$beover)]
+
+
+md2$dir <- md2$un > md2$re
+md2$diff <-  md2$re- md2$un
+md2$regn <- paste0(md2$group, "reg")
+
+md2 <- left_join(md2, select(sampleinfo, sample, predage), by=c("regn"= "sample")) 
+
+
+ #left_join(hkdat, sampleinfo, by="sample") %>%
+atleast <-10
+ overthresh <- 1
+ chithresh <- 500
+
+ 
+ 
+md2$good <- paste0(md2$group, "un") %in% qualsum$sample[qualsum$chistat < chithresh] &
+            paste0(md2$group, "un") %in% qualsum$sample[qualsum$over10 >= overthresh] &
+            paste0(md2$group, "reg") %in% qualsum$sample[qualsum$chistat < chithresh] &
+            paste0(md2$group, "reg") %in% qualsum$sample[qualsum$over10 >= overthresh] 
+
+#md2$good= <-  md2$unover >=thresh & md2$reover >=thresh
+
+limrange <- max(abs(md2$diff))
+
+
+#round(wilcox.test(md2$un[md2$good], md2$re[md2$good])$p.value,3)
+
+
+ggplot(subset(md2, md2$good), aes(x=group, y=diff, fill=dir)) +
+  ylim(-limrange, limrange)+
+  theme_bw()+
+  ylab("Rejuvenation Effect (weeks age difference)")+
+  xlab("Sample Group")+
+  geom_bar(stat="identity") +
+  scale_fill_manual(name="", 
+                    values=c("orangered", "forest green"), 
+                    labels=c("Aged", "Rejuvenated"))+
+  ggtitle("Rejuvenation Effect", 
+          subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used", "\nSamples with at least ", overthresh, " housekeeping genes with at least ",atleast, " reads\nChi-stat < ", chithresh, "\np-value of t-test between regenerated and unamputated: ", 
+round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3))) +
+  theme(plot.background = element_rect(fill = "transparent",colour = "transparent"))
+
+
+
+
+
+```
