@@ -18,6 +18,13 @@ library(gtools)
 library(FinCal)
 library(ggrepel)
 library(reshape2)
+
+
+
+ rep.row<-function(x,n){
+   matrix(rep(x,each=n),nrow=n)
+ } 
+
 #library(e10)
 ````
 
@@ -53,67 +60,132 @@ mymodel <- currbestgbm
 md <- md[, colnames(md) %in% mymodel$coefnames]
 
 regs <- subset(md, substr(rownames(md),2,4) == "reg")
-
-
 uns <- subset(md, substr(rownames(md),2,3) == "un")
+
+reguns <- rbind(regs, uns)
 
 r <- nrow(regs)
 c <- ncol(regs)
 
+
+ 
+ 
+mreguns <- melt(rownames_to_column(reguns))
+
+colnames(mreguns) <- c("sample", "marker", "exp")
 ````
 
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+nperm <- 500
+
+mm3<- data.frame(matrix(ncol = 4, nrow = 0))
+colnames(mm3) <- c( "group" , "marker" ,"choice" ,"perm" )
+for (i in 1:ncol(reguns)){
+
+#for (i in 1:3){
+  
+cm <- colnames(reguns)[i]
+
+
+
+mm2<- data.frame(matrix(ncol = 4, nrow = 0))
+colnames(mm2) <- c( "group" , "marker" ,"choice" ,"perm" )
+for (j in 1:nperm){
+
 m1 <- as.data.frame(round(matrix(runif(r*c), r, c)))
 
 
-m1 <- as.data.frame(round(matrix(runif(1*c), 1, c)))
+choices <-sample(c("reg", "un"), size=ncol(regs), replace=TRUE)
+ 
+m1 <- as.data.frame(rep.row(choices,r))
 
-rownames(m1) <- substr(rownames(regs),1,1)
 colnames(m1) <- colnames(regs)
+m1$group <- substr(rownames(regs),1,1)
 
 
 
-mm1 <- melt(rownames_to_column(m1))
+mm1 <- gather(m1, key= marker, value="choice", -group)
+mm1$perm <- j
+mm2 <- rbind(mm2,mm1)
 
-colnames(mm1) <- c("group", "marker", "choice")
-
-rownames(regs) <- substr(rownames(regs),1,1)
-mregs <- melt(rownames_to_column(regs))
-
-colnames(mregs) <- c("group", "marker", "value")
-mregs$choice <- 1
-
-rownames(uns) <- substr(rownames(uns),1,1)
-muns<- melt(rownames_to_column(uns))
-
-colnames(muns) <- c("group", "marker", "value")
-muns$choice <- 0
+}
 
 
-a <- filter(left_join(mm1, mregs, by=c("group", "marker", "choice") ), !is.na(value))
-b <- filter(left_join(mm1, muns, by=c("group", "marker", "choice")), !is.na(value))
-mm1 <- arrange(rbind(a,b), group, marker)
+mm2$choice[mm2$marker == cm] <- "reg"
+mm2$sample <- paste0(mm2$group, mm2$choice)
 
-mm1 <- rbind( a, b )%>%
-  arrange(group, marker)
-
-sm1 <- spread(select(mm1, -choice), value="value", key="marker") #%>%
-#  column_to_rownames(var="group")
+mm2$cm <- cm
 
 
+mm3 <- rbind(mm2, mm3)
 
-sm1$agepred <- predict(mymodel, newdata= select(sm1, -group))
+}
 
-mm1 <- left_join(mm1, select(sm1, group, agepred), by="group")
+mm3 <- left_join(mm3, mreguns, by=c("sample", "marker"))
+
+
+sm3 <- spread(select(mm3,-sample, -choice), value="exp", key="marker")
+
+sm3$predage <- predict(mymodel, newdata= sm3[,colnames(sm3)%in% colnames(reguns)])
 
 ````
 
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+reguns2 <-mutate(reguns, predage= predict(mymodel, newdata=reguns), 
+                 state= substr(rownames(reguns),2,6), 
+                 group = substr(rownames(reguns),1,1))
 
+
+rvals <- select(reguns2, predage, state, group) %>%
+  spread(value="predage", key="state")
+
+
+
+ggplot(sm3, aes(x=predage))+
+  geom_density()+
+  facet_grid(group~cm)+
+  geom_segment(data=reguns2, aes(x=predage, xend=predage, y=0, yend=0.1, colour=state),alpha=1, size=1.5)
+
+
+groupmeans <- dplyr::group_by(sm3, group)%>%
+  dplyr::summarise(meanpredage = mean(predage))
+
+
+sm4 <- select(sm3, predage, group, perm, cm) %>%
+  left_join(rvals, by="group") %>%
+  mutate(mid=(reg+un)/2,          midiff = (reg+un)/2 - predage)  %>%
+  left_join(groupmeans, by="group") %>%
+  mutate(meandiff = meanpredage-predage)
+
+
+
+ggplot(sm4, aes(x=midiff))+
+  geom_density()+
+  facet_wrap(~cm)
+
+sm4$ma <- substr(sm4$cm,1,2)
+
+
+ggplot(sm4, aes(y=meandiff, x=ma))+
+  geom_boxplot()+
+  ylim(-5,5)+
+  geom_hline(yintercept = 0)+
+#  facet_wrap(~cm)+
+  theme_bw()+
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 5, hjust = 1))
+    
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+save(sm3, sm4, file="perms.rdata")
 
 ````
 

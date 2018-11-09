@@ -51,9 +51,9 @@ md <- as.data.frame(subset(t(ctall.norm),
 
 
 
-mymodel <- currbestgbm
+mymodel <- currbest
 
-mymodel <- rfagemodel61
+#mymodel <- rfagemodel61
 md <- md[, colnames(md) %in% mymodel$coefnames]
 
 
@@ -115,6 +115,7 @@ limrange <- max(abs(md2$diff))
 
 round(wilcox.test(md2$un[md2$good], md2$re[md2$good])$p.value,3)
 
+md2$group <- factor(md2$group, levels=md2$group[order(md2$diff)])
 
 ggplot(subset(md2, md2$good), aes(x=group, y=diff, fill=dir)) +
   ylim(-limrange, limrange)+
@@ -152,8 +153,9 @@ md <- as.data.frame(subset(t(ctall.norm),
  )
 
 
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
 
-mymodel <- currbestgbm
+mymodel <- currbest
 md <- md[, colnames(md) %in% mymodel$coefnames]
 md$rfagepred <- predict(mymodel, newdata= md)
 
@@ -169,7 +171,7 @@ reglist <- c(paste0(md2$group[md2$good], c("un")), paste0(md2$group[md2$good], c
 
 (p=ggplot(md, aes(x=predage, y=rfagepred))+
 
-#  geom_text_repel(aes(label=sample), size=2.5)   + 
+  geom_text_repel(aes(label=sample), size=2.5)   + 
   geom_point(colour="grey")+
   xlab("Age (weeks) from body length") +
   ylab(paste0("Age (weeks) from marker gene expression (", toupper(mymodel$method), ")"))+
@@ -177,6 +179,38 @@ reglist <- c(paste0(md2$group[md2$good], c("un")), paste0(md2$group[md2$good], c
   theme_bw()+
   geom_segment(data=subset(md2, md2$good), aes(x=predage, xend=predage, y=un, yend=re, colour=dir),alpha=1, size=1.5, 
                arrow= arrow(length=unit(0.30,"cm"), ends="last", type = "open"))+
+ # geom_text_repel(data=subset(md, md$sample %in% reglist), aes(label=sample))+
+  scale_colour_manual(name="", 
+                    values=c("orangered", "forest green"), 
+                    labels=c("Aged", "Rejuvenated"))+
+  ggtitle("Change in molecular age due to regeneration", 
+          subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used", "\nSamples with at least ", thresh, " housekeeping genes expressed in both  \np-value of t-test between regenerated and unamputated: ", 
+round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3))) )
+
+
+#ggsave(plot=p, file="rejuveff.pdf", height=8, width=8)
+```
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+(p=ggplot(md, aes(x=predage, y=rfagepred))+
+
+#  geom_text_repel(aes(label=sample), size=2.5)   + 
+  geom_point(colour="grey")+
+  xlab("Age (weeks) from body length") +
+  ylab(paste0("Age (weeks) from marker gene expression (", toupper(mymodel$method), ")"))+
+  geom_smooth(method="lm", colour="black", data=subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") ))+
+  theme_bw()+
+  geom_segment(data=subset(md2, md2$good), aes(x=predage, xend=predage, y=un, yend=re, colour=dir),alpha=1, size=1.5)+
+  geom_point(data=subset(md2, md2$good), aes(x=predage, y=un),size=3, colour="cornflower blue")+
+  geom_point(data=subset(md2, md2$good), aes(x=predage, y=re),size=3, colour="lime green")+
+  
+  geom_text(data=subset(md2, md2$good), aes(x=predage, y=un), colour="white",size=2, label="C")+
+  geom_text(data=subset(md2, md2$good), aes(x=predage, y=re), colour="white",size=2, label="R")+
  # geom_text_repel(data=subset(md, md$sample %in% reglist), aes(label=sample))+
   scale_colour_manual(name="", 
                     values=c("orangered", "forest green"), 
