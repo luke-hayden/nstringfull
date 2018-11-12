@@ -253,6 +253,8 @@ sampleinfo <- left_join(sampleinfo, dplyr::select(preddf, sample, predage), by="
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
+save(lena ,m,mnew, polymod2, polymod3, file="lena.rdata")
+
 
 save(sampleinfo , file="sampleinfo.rdata")
 

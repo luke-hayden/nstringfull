@@ -145,7 +145,7 @@ goodgroups<- subset(md2, md2$good)$group
 
 md <- as.data.frame(subset(t(ctall.norm), 
                            (sik$sex == "F" &
-                              sik$over3 >= thresh&
+                              sik$over10 >= overthresh&
                  sik$exp %in% c("Size-age", "cohorts", "OvY", "regen") & 
                  sik$type %in% c("O", "Y", "M", "OR", "MR", "YR")
                  &                 !  sik$sample %in% c("AF", "AG")
