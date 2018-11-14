@@ -48,7 +48,26 @@ load(file="rfagemodelbadcv.rdata")
 
 
 ````
-#Did everybody get their bun?
+
+#Did everybody get a bun?
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+buns <- data.frame(Status=c("With bun", "Without bun"), Happiness=c(100, 3))
+
+ggplot(buns, aes(Status, Happiness, fill=Status))+
+  geom_bar(stat="identity")+
+  theme_bw()+
+  scale_fill_manual(values=c("cornflower blue", "red3"))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
+  
+
+
+
+```
 
 
 #Project
@@ -144,7 +163,8 @@ ggplot(mnmd, aes(x= sname, y=normexp, colour=type))+
 
 
 ````
-#Age-length relationship
+
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 mlena <- gather(lena, key="model", value="pred", c("bcpred", "linpred", "polypred2", "polypred3"))
@@ -361,7 +381,8 @@ ggplot(mnmd, aes(x=predage, y=normexp))+
 
 
 
-#Old RF model
+#Old Random Forest model
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 mymodel <- trterfagemodel
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
@@ -423,7 +444,101 @@ RMSEte <- sqrt(mean( (md$rfagepred[md$intrain == F] - md$predage[md$intrain == F
 
 ````
 
-#Quality thresholds
+#Quality assurance 1: Read number
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+md <- as.data.frame(t(subset(t(ctall.unnorm), 
+                 sampleinfo$prep == "Nikos" & 
+                 sampleinfo$ctg %in% 3:4&
+  !(sampleinfo$sample %in% c("O1a", "O1b", "YR1a", "YR1b" , "YR2a", "YR2b")))))
+
+
+si <- subset(sampleinfo, sampleinfo$sample %in% colnames(md))
+
+
+sl <- as.character(sampleinfo$sample[sampleinfo$sample %in% colnames(md)])
+
+md$marker <- rownames(md)
+
+mmd <- gather(as.data.frame(md), key="sample", value="expression", sl) 
+mmd$gp <- substr(mmd$sample, 1, nchar(mmd$sample)-1)
+
+mmd$rep <- substr(mmd$sample,  nchar(mmd$sample), nchar(mmd$sample))
+
+
+md <- select(mmd, -sample) 
+
+
+mmd2 <- left_join( select(dplyr::rename(filter(md, rep=="a"), expression_a =expression), -rep),
+                   select(dplyr::rename(filter(md, rep=="b"), expression_b =expression), -rep),
+                   by=c("marker", "gp") )
+
+
+ggplot(mmd2, aes(x=expression_a, y=expression_b))+
+  geom_point(alpha=0.1, colour="red2")+
+  geom_smooth(method="lm")+
+# geom_hex()+
+  theme_bw()+
+   scale_x_log10()+
+  scale_y_log10()+
+  xlab("Expression Replicate B")+
+  ylab("Expression Replicate A")+
+ ggtitle("How much expression needed for replicability? ", subtitle = "All genes, samples with replicates")+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent"))
+
+````
+
+
+#Quality assurance 2: Housekeeping gene ratio
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+log <-    sampleinfo$flag == FALSE
+
+
+mhk <- as.data.frame(t(ctall.hk[,log==T])) 
+
+expected <- colSums(mhk)/sum(colSums(mhk))
+
+mhkall <-  as.data.frame(t(ctall.hk)) 
+
+mhkall <- subset(mhkall, rowSums(mhkall) !=0)
+
+eo <- cbind(mhkall, t(data.frame(expected)))
+
+   # expected proportions
+
+
+chi.result <- apply(eo, 1, function (x) chisq.test(x=x[1:5],p=x[6:10]))
+mhkall$p_value <- unlist(lapply(chi.result, function(x) x$p.value))
+
+mhkall$chistat <- unlist(lapply(chi.result, function(x) x$statistic))
+
+mhkall$flag <- rownames(mhkall) %in% sampleinfo$sample[sampleinfo$flag==T]
+mhkall$sample <- rownames(mhkall)
+
+
+
+
+mhkall$sample <- factor(mhkall$sample, levels=mhkall$sample[order(mhkall$chistat)])
+
+
+(p=ggplot(mhkall, aes(y=chistat,x=sample, fill=flag))+
+  geom_bar(stat="identity")+
+coord_flip()+
+  theme_bw()+
+  ylab("Chi-square stat (deviation from expected housekeeping ratio)")+
+scale_fill_brewer(palette="Set1"))+
+  ggtitle("Ranking deviation from observed/expected")+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent"))
+
+
+```
 
 #40-fold cross-validation
 
@@ -574,11 +689,7 @@ md$lab <- factor(md$lab, levels=unique(md$lab[order(md$Overall, decreasing=T)]))
 
 ````
 
-It looks like some optimisation on the basis of these profiles may further improve the model's fit. 
-
-
-
-#GBM
+#Gradient Boosting Machine
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 mymodel <- rfagemodel61
@@ -671,6 +782,7 @@ ggplot(vrimpgbm, aes(x=sname, y=rel.inf))+
 ````
 
 #Marker contributions and profiles
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.height = 12}
 
 
@@ -969,7 +1081,7 @@ md2$good <- paste0(md2$group, "un") %in% qualsum$sample[qualsum$chistat < chithr
 limrange <- max(abs(md2$diff))
 
 
-round(wilcox.test(md2$un[md2$good], md2$re[md2$good])$p.value,3)
+#round(wilcox.test(md2$un[md2$good], md2$re[md2$good])$p.value,3)
 
 md2$group <- factor(md2$group, levels=md2$group[order(md2$diff)])
 
@@ -1142,7 +1254,7 @@ md2$good <- paste0(md2$group, "un") %in% qualsum$sample[qualsum$chistat < chithr
 limrange <- max(abs(md2$diff))
 
 
-round(wilcox.test(md2$un[md2$good], md2$re[md2$good])$p.value,3)
+#round(wilcox.test(md2$un[md2$good], md2$re[md2$good])$p.value,3)
 
 md2$group <- factor(md2$group, levels=md2$group[order(md2$diff)])
 
