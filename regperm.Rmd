@@ -54,7 +54,7 @@ md <- as.data.frame(subset(t(ctall.norm),
                  sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")
  )))
 
-mymodel <- currbestgbm
+mymodel <- currbest
 
 #mymodel <- rfagemodel61
 md <- md[, colnames(md) %in% mymodel$coefnames]
@@ -78,7 +78,7 @@ colnames(mreguns) <- c("sample", "marker", "exp")
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-nperm <- 500
+nperm <- 100
 
 mm3<- data.frame(matrix(ncol = 4, nrow = 0))
 colnames(mm3) <- c( "group" , "marker" ,"choice" ,"perm" )
@@ -150,6 +150,11 @@ ggplot(sm3, aes(x=predage))+
   facet_grid(group~cm)+
   geom_segment(data=reguns2, aes(x=predage, xend=predage, y=0, yend=0.1, colour=state),alpha=1, size=1.5)
 
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 groupmeans <- dplyr::group_by(sm3, group)%>%
   dplyr::summarise(meanpredage = mean(predage))
@@ -159,25 +164,53 @@ sm4 <- select(sm3, predage, group, perm, cm) %>%
   left_join(rvals, by="group") %>%
   mutate(mid=(reg+un)/2,          midiff = (reg+un)/2 - predage)  %>%
   left_join(groupmeans, by="group") %>%
-  mutate(meandiff = meanpredage-predage)
+  mutate(meandiff = meanpredage-predage) 
 
 
 
-ggplot(sm4, aes(x=midiff))+
-  geom_density()+
-  facet_wrap(~cm)
+msummar <- group_by(sm4, cm)%>%
+  dplyr::summarise(cmmeandiff = mean(meandiff))%>%
+  mutate(dir= cmmeandiff > 0)
 
+sm4 <- left_join(sm4, msummar, by="cm")
+sm4$cm <- factor(sm4$cm, levels=)
+
+ggplot(sm4, aes(x=midiff, fill=cmmeandiff))+
+  geom_density(aes(fill=dir))+
+  facet_wrap(~cm)+
+  theme_bw()+
+scale_fill_brewer(palette="Set1", name="Sample flagged?")+
+  xlab("Distance from midpoint between regenerated and contralateral sample")+
+  ggtitle("Which markers rejuvenate?", 
+          subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used\n", 
+                           nperm, " permutations"))
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 sm4$ma <- substr(sm4$cm,1,2)
 
+ggplot(sm4, aes(x=midiff, fill=cmmeandiff))+
+  geom_density(aes(fill=dir))+
+  facet_wrap(~cm)+
+  theme_bw()+
+scale_fill_brewer(palette="Set1", name="Sample flagged?")+
+  xlab("Distance from midpoint between regenerated and contralateral sample")+
+  ggtitle("Which markers rejuvenate?", 
+          subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used\n", 
+                           nperm, " permutations"))
 
-ggplot(sm4, aes(y=meandiff, x=ma))+
+ggplot(sm4, aes(y=meandiff, x=ma, fill=cmmeandiff))+
   geom_boxplot()+
   ylim(-5,5)+
   geom_hline(yintercept = 0)+
 #  facet_wrap(~cm)+
   theme_bw()+
  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
-    size = 5, hjust = 1))
+    size = 5, hjust = 1))+
+  ggtitle(""
     
 
 ````
