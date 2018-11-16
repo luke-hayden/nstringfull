@@ -282,6 +282,8 @@ vrimprf$sname <- factor(vrimprf$sname, levels=vrimprf$sname[order(vrimprf$Overal
   ggtitle("Marker contributions", subtitle= paste0("random forest model built with ", length(mymodel$coefnames), " markers"))
 )
 
+save(vrimprf, file="vrimprf.rdata")
+
 #ggsave(plot=p,height=5,width=5,dpi=200, filename=paste("contribs.pdf"), useDingbats=FALSE, limitsize = FALSE)
 ````
 

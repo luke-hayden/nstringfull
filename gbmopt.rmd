@@ -85,12 +85,26 @@ gbmagemodel <- train(
 ```{r gbm plot, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 plot(gbmagemodel)
 
+pdf("gbmbigparams.pdf",height=10, width=14)
+
+
+plot(gbmagemodelbig)
+
+dev.off()
+
+ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("gbmbigparams.pdf"), useDingbats=FALSE, limitsize = FALSE)
+
+
+gbmagemodelbig$call
+
+
+gbmagemodel$call
 save(gbmagemodel, file="gbmnew.rdata")
 #summary(currbest$finalModel)
 ````
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-mymodel <- gbmagemodel
+mymodel <- gbmagemodelbig
 
 
 #mymodel <- currbestgbm
@@ -145,6 +159,7 @@ RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == 
                           "\nRMSE in test data: ", round(RMSEte,3))))#+  facet_wrap(~intrain)
 
 
+ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("gbmbig1.pdf"), useDingbats=FALSE, limitsize = FALSE)
 ```
 
 ####Variable importance
