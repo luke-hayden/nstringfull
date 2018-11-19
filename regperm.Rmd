@@ -176,6 +176,15 @@ msummar <- group_by(sm4, cm)%>%
 sm4 <- left_join(sm4, msummar, by="cm")
 sm4$cm <- factor(sm4$cm, levels=unique(sm4$cm[order(sm4$cmmeandiff)]))
 
+msummar <- mutate(msummar, ma= substr(cm, 1,2)) %>%
+                  left_join(vrimprf, by=c("ma"= "sname"))
+sm4$ma <- substr(sm4$cm,1,2)
+
+sm4 <-  left_join(sm4,vrimprf, by=c("ma"= "sname"))
+```
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 ggplot(sm4, aes(x=midiff))+
   geom_density(aes(fill=dir))+
   facet_wrap(~cm)+
@@ -191,9 +200,11 @@ scale_fill_brewer(palette="Set1")+
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-sm4$ma <- substr(sm4$cm,1,2)
+
 
 sm4$ma <- factor(sm4$ma, levels=unique(sm4$ma[order(sm4$cmmeandiff)]))
+
+sm4$map <- paste0(sm4$ma, "\n", round(sm4$Overall,0))
 
 ggplot(sm4, aes(y=meandiff, x=ma, fill=dir))+
   geom_boxplot()+
@@ -201,7 +212,7 @@ ggplot(sm4, aes(y=meandiff, x=ma, fill=dir))+
   geom_hline(yintercept = 0)+
 #  facet_wrap(~cm)+
   theme_bw()+
- theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+ theme(axis.text.x = element_text(angle = 0, vjust = 1, 
     size = 5, hjust = 1))+
   scale_fill_manual(values=c("forest green", "orangered"), labels= c("Marker rejuvenates", "Marker ages"), name="Response to regeneration")+
   ylab("Distance from midpoint between regenerated and contralateral sample")+
@@ -214,9 +225,10 @@ ggplot(sm4, aes(y=meandiff, x=ma, fill=dir))+
 ````
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-msummar <- mutate(msummar, ma= substr(cm, 1,2)) %>%
-                  left_join(vrimprf, by=c("ma"= "sname"))
-sm4 <-  left_join(sm4,vrimprf, by=c("ma"= "sname"))
+
+
+
+
 ggplot(msummar, aes(y=cmmeandiff, x=Overall, fill=dir))+
   geom_point(shape=21)+
 #  ylim(-5,5)+
@@ -228,25 +240,25 @@ ggplot(msummar, aes(y=cmmeandiff, x=Overall, fill=dir))+
   xlab("Marker importance")+
   ggtitle("Which markers rejuvenate?", 
           subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used\n", 
-                           nperm, " permutations"))
-
-ggplot(sm4, aes(y=meandiff, x=Overall, fill=dir))+
-  geom_point(alpha=0.02)+
-#  ylim(-5,5)+
-  geom_hline(yintercept = 0)+
-#  facet_wrap(~cm)+
-  theme_bw()+
-  scale_fill_manual(values=c("forest green", "orangered"))+
-  ylab("Distance from midpoint between regenerated and contralateral sample")+
-  ggtitle("Which markers rejuvenate?", 
-          subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used\n", 
-                           nperm, " permutations"))    
+                           nperm, " permutations"))+
+  geom_smooth(aes(y=cmmeandiff, x=Overall), inherit.aes=F, method="lm", se=F)
+# 
+# ggplot(sm4, aes(y=meandiff, x=Overall, fill=dir))+
+#   geom_point(alpha=0.02)+
+# #  ylim(-5,5)+
+#   geom_hline(yintercept = 0)+
+# #  facet_wrap(~cm)+
+#   theme_bw()+
+#   scale_fill_manual(values=c("forest green", "orangered"))+
+#   ylab("Distance from midpoint between regenerated and contralateral sample")+
+#   ggtitle("Which markers rejuvenate?", 
+#           subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used\n", 
+#                            nperm, " permutations"))    
 ```
 
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-sm4$ma <- substr(sm4$cm,1,2)
 
 sm4$ma <- factor(sm4$ma, levels=unique(sm4$ma[order(sm4$Overall)]))
 
