@@ -86,9 +86,9 @@ md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
                  sampleinfo$type %in% c("O", "Y", "M")
 ))
 
-md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$over3 >= 4 & qualsum$chistat <500])
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$over10 >= 4 & qualsum$chistat <500])
 
-tr%in% qualsum$sample[qualsum$over3 >= 4 & qualsum$chistat <500]
+tr%in% qualsum$sample[qualsum$over10 >= 4 & qualsum$chistat <500]
 
 
 md <- md[,colnames(md) %in% mymodel$coefnames]
@@ -175,8 +175,8 @@ md <- left_join(md, sampleinfo, by="sample") %>%
 md$group <- substr(md$sample, 1,1)
 md$ty <- substr(md$sample, 2,3)
 
-mdhk <-    select(md, over3, group, ty ) %>%
-  spread(value= over3, key=ty)
+mdhk <-    select(md, over10, group, ty ) %>%
+  spread(value= over10, key=ty)
 
 colnames(mdhk)[2:4] <- paste0(colnames(mdhk)[2:4], "over")
 
@@ -199,15 +199,15 @@ md2 <- left_join(md2, select(sampleinfo, sample, predage), by=c("regn"= "sample"
 
  #left_join(hkdat, sampleinfo, by="sample") %>%
 atleast <- 3
- overthresh <- 4
+ overthresh <- 1
  chithresh <- 500
 
  
  
 md2$good <- paste0(md2$group, "un") %in% qualsum$sample[qualsum$chistat < chithresh] &
-            paste0(md2$group, "un") %in% qualsum$sample[qualsum$over3 >= overthresh] &
+            paste0(md2$group, "un") %in% qualsum$sample[qualsum$over10 >= overthresh] &
             paste0(md2$group, "reg") %in% qualsum$sample[qualsum$chistat < chithresh] &
-            paste0(md2$group, "reg") %in% qualsum$sample[qualsum$over3 >= overthresh] 
+            paste0(md2$group, "reg") %in% qualsum$sample[qualsum$over10 >= overthresh] 
 
 #md2$good= <-  md2$unover >=thresh & md2$reover >=thresh
 
@@ -218,7 +218,7 @@ round(wilcox.test(md2$un[md2$good], md2$re[md2$good])$p.value,3)
 
 md2$group <- factor(md2$group, levels=md2$group[order(md2$diff)])
 
-ggplot(subset(md2, md2$good), aes(x=group, y=diff, fill=dir)) +
+(p=ggplot(subset(md2, md2$good), aes(x=group, y=diff, fill=dir)) +
   ylim(-limrange, limrange)+
   theme_bw()+
   ylab("Rejuvenation Effect (weeks age difference)")+
@@ -229,10 +229,16 @@ ggplot(subset(md2, md2$good), aes(x=group, y=diff, fill=dir)) +
                     labels=c("Aged", "Rejuvenated"))+
   ggtitle("Rejuvenation Effect", 
           subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used", "\nSamples with at least ", overthresh, " housekeeping genes with at least ",atleast, " reads\nChi-stat < ", chithresh, "\np-value of t-test between regenerated and unamputated: ", 
-round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3))) 
+round(t.test(md2$un[md2$good], md2$re[md2$good])$p.value,3))) +
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent")
 
-
+)
+)
 goodgroups<- subset(md2, md2$good)$group
+
+
+ggsave(plot=p,height=7,width=10,dpi=200, filename=paste("gbmregeff.png"),device="png", bg = "transparent", limitsize = FALSE)
 
 
 
@@ -283,14 +289,11 @@ mmd2 <- gather(subset(md2, md2$good), value="modelage",key="state", c("re", "un"
   ylab("Age (weeks) inferred from marker gene expression (random forest model)")+
   geom_smooth(method="lm", colour="black", data=subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") ))+
   theme_bw()+
-  geom_segment(data=subset(md2, md2$good), aes(x=predage, xend=predage, y=un, yend=re, colour=dir),alpha=1, size=1.5)+
-    geom_point(data=mmd2, aes(x=predage, y=modelage, fill=state), shape=21)+
-  scale_fill_manual(name="", 
-                    values=c("lime green", "cornflower blue", "forest green"), 
-                    labels=c("Regenerated limb", "Contralateral limb"))+
+#  geom_segment(data=subset(md2, md2$good), aes(x=predage, xend=predage, y=un, yend=re, colour=dir),alpha=1, size=1.5)+
+    geom_point(data=mmd2, aes(x=predage, y=modelage, colour=state))+
   scale_colour_manual(name="", 
-                    values=c("orangered", "forest green"), 
-                    labels=c("Aged", "Rejuvenated"))+
+                    values=c("lime green", "white", "forest green"), 
+                    labels=c("Regenerated limb", "    "))+
     ggtitle("Change in molecular age due to regeneration", 
           subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used"))+
   theme(
@@ -299,7 +302,31 @@ mmd2 <- gather(subset(md2, md2$good), value="modelage",key="state", c("re", "un"
 ) 
 
 
-ggsave(plot=p,height=7,width=10,dpi=200, filename=paste("rfwregen.png"),device="png",  limitsize = FALSE)
+ggsave(plot=p,height=7,width=10,dpi=200, filename=paste("rfwregen1.png"),bg = "transparent",device="png",  limitsize = FALSE)
+
+
+(p=ggplot(md, aes(x=predage, y=rfagepred))+
+
+#  geom_text_repel(aes(label=sample), size=2.5)   + 
+  geom_point(colour="grey")+
+  xlab("Age (weeks) inferred from body length") +
+  ylab("Age (weeks) inferred from marker gene expression (random forest model)")+
+  geom_smooth(method="lm", colour="black", data=subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") ))+
+  theme_bw()+
+#  geom_segment(data=subset(md2, md2$good), aes(x=predage, xend=predage, y=un, yend=re, colour=dir),alpha=1, size=1.5)+
+    geom_point(data=mmd2, aes(x=predage, y=modelage, colour=state))+
+  scale_colour_manual(name="", 
+                    values=c("lime green", "cornflower blue", "forest green"), 
+                    labels=c("Regenerated limb", "Contralateral limb"))+
+    ggtitle("Change in molecular age due to regeneration", 
+          subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used"))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
+) 
+
+
+ggsave(plot=p,height=7,width=10,dpi=200, filename="rfwregen2.png",device="png",  bg = "transparent",limitsize = FALSE)
 
 
   

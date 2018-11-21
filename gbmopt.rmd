@@ -16,7 +16,7 @@ library(caret)
 library(RColorBrewer)
 library(ggrepel)
 library(gtools)
-library(FinCal)
+#library(FinCal)
 ````
 
 
@@ -28,6 +28,9 @@ load(file="allns_data.rdata")
 load("modelgbm.rdata")
 load("models.rdata")
 load("vardat.rdata")
+
+load(file="qualitydat.rdata")
+load(file="sampleinfo.rdata")
 load(file="markerchoiceinfo.rdata")
 ````
 
@@ -83,31 +86,64 @@ gbmagemodel <- train(
 
 
 ```{r gbm plot, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-plot(gbmagemodel)
-
-pdf("gbmbigparams.pdf",height=10, width=14)
 
 
-plot(gbmagemodelbig)
+pdf("gbm1params.pdf",height=10, width=14)
+
+plot(gbmagemodel1)
 
 dev.off()
 
-ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("gbmbigparams.pdf"), useDingbats=FALSE, limitsize = FALSE)
 
 
-gbmagemodelbig$call
+pdf("gbm2params.pdf",height=10, width=14)
+
+plot(gbmagemodel2)
+
+dev.off()
+
+pdf("gbm3params.pdf",height=10, width=14)
+
+plot(gbmagemodel3)
+
+dev.off()
+
+pdf("gbm4params.pdf",height=10, width=14)
+
+plot(gbmagemodel4)
+
+dev.off()
+
+pdf("gbm5params.pdf",height=10, width=14)
+
+plot(gbmagemodel5)
+
+dev.off()
 
 
-gbmagemodel$call
-save(gbmagemodel, file="gbmnew.rdata")
+
+
+
+pdf("gbm6params.pdf",height=10, width=14)
+
+plot(gbmagemodel6)
+
+dev.off()
+
+pdf("gbmoldparams.pdf",height=10, width=14)
+
+plot(gbmagemodel)
+
+dev.off()
+#save(gbmagemodel, file="gbmnew.rdata")
 #summary(currbest$finalModel)
 ````
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-mymodel <- gbmagemodelbig
+mymodel <- gbmagemodelp5
 
 
-#mymodel <- currbestgbm
+#mymodel <- gbmagemodel
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
@@ -146,7 +182,7 @@ RMSEtr <- sqrt(mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == 
 
 RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
 
-(p=ggplot(md, aes(x=predage, y=gbmagepred,colour=intrain))+
+(p=    ggplot(md, aes(x=predage, y=gbmagepred,colour=intrain))+
   geom_point()+
   xlab("Age (weeks) from body length") +
   ylab("Age (weeks) from marker gene expression")+
@@ -156,10 +192,28 @@ RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == 
   geom_text_repel(aes(label=sample), size=2.5)+
   ggtitle("Using Marker gene expression to predict age", 
           subtitle=paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used \nRMSE in training data: ", round(RMSEtr,3), 
-                          "\nRMSE in test data: ", round(RMSEte,3))))#+  facet_wrap(~intrain)
+                          "\nRMSE in test data: ", round(RMSEte,3)))+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+                          
+                        
+                          
+                          
+                          ))
+                          
+                          
+                          #as.character(mymodel$bestTune[1:5]))))
+          
+        
+  
+  )#+  facet_wrap(~intrain)
 
+mymodel$call
 
-ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("gbmbig1.pdf"), useDingbats=FALSE, limitsize = FALSE)
+#ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("gbmold.pdf"), useDingbats=FALSE, limitsize = FALSE)
 ```
 
 ####Variable importance
