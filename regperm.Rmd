@@ -53,7 +53,7 @@ md <- as.data.frame(subset(t(ctall.norm),
                  sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")
  )))
 
-mymodel <- currbest
+mymodel <- gbm51
 
 #mymodel <- rfagemodel61
 md <- md[, colnames(md) %in% mymodel$coefnames]
@@ -194,7 +194,7 @@ groupmeans <- dplyr::group_by(sm3, group)%>%
 mameans <- dplyr::group_by(sm3, cm)%>%
   dplyr::summarise(meanpredage = mean(predage), 
                    meandiff = mean(predagediff))
-sm5 <
+#sm5 <
 
 
 
@@ -209,7 +209,9 @@ sm4 <- select(sm3,  predage, predagediff, predagecontrol, group, perm, cm) %>%
   left_join(vrimprf, by=c("ma"= "sname", "cm"="name"))
 
 sm5 <-mameans %>%
-  left_join(vrimprf, by=c("cm"="name")) %>%
+#  left_join(vrimprf, by=c("cm"="name")) %>%
+  
+  left_join(vrimpgbm, by=c("cm"="var")) %>%
   mutate(dir = meandiff >0 )
 
 ````
@@ -250,7 +252,7 @@ ggplot(sm4, aes(x=ma, y=predagediff, fill=dir))+
 
 sm5$sname <- factor(sm5$sname, levels=unique(sm5$sname[order(sm5$meandiff)]))
 
-ggplot(sm5, aes(x=sname, y=meandiff, fill=dir, size=Overall))+
+ggplot(sm5, aes(x=sname, y=meandiff, fill=dir, size=rel.inf))+
   geom_point(shape=21)+
   geom_hline(yintercept = 0)+
 #  facet_wrap(~cm)+
@@ -269,6 +271,7 @@ ggplot(sm5, aes(x=sname, y=meandiff, fill=dir, size=Overall))+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 save(sm3, sm4, sm5, file="permsrf.rdata")
 
+save(sm3, sm4, sm5, file="permsgbm.rdata")
 ````
 
 

@@ -48,7 +48,10 @@ md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 
 md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
 
+md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.04]
 md <- md[, colnames(md) %in% c(minf$name[minf$in61==T], "predage")]
+
+
 
 md$sample <- rownames(md)
 
@@ -140,10 +143,10 @@ dev.off()
 ````
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-mymodel <- gbmagemodelp5
+mymodel <- currbestgbm
 
 
-#mymodel <- gbmagemodel
+mymodel <- gbm51
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
@@ -175,12 +178,16 @@ md <- subset(md, !(is.na(md$predage)))
 
 
 RMSEtr <- sqrt(mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
-
-
-
-
-
 RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+
+(restr <- sqrt(median( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2)))
+(reste <- sqrt(median( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2)))
+
+
+(restr <- mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+
+(reste <- mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
 
 (p=    ggplot(md, aes(x=predage, y=gbmagepred,colour=intrain))+
   geom_point()+
@@ -213,6 +220,9 @@ RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == 
 
 mymodel$call
 
+
+save(gbm51, file="gbm51.rdata")
+
 #ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("gbmold.pdf"), useDingbats=FALSE, limitsize = FALSE)
 ```
 
@@ -224,7 +234,9 @@ Variable importance obtained via permutation
 
 
 mymodel <- currbestgbm
-mymodel <- gbmagemodel
+mymodel <- gbm51
+
+#mymodel <- gbmagemodel
 vrimpgbm <- summary(mymodel)
 
 
