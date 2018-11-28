@@ -220,6 +220,9 @@ RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == 
 
 mymodel$call
 
+
+save(gbm51, file="gbm51.rdata")
+
 #ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("gbmold.pdf"), useDingbats=FALSE, limitsize = FALSE)
 ```
 
