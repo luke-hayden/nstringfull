@@ -51,8 +51,10 @@ md <- as.data.frame(subset(t(ctall.norm),
 
 
 
-mymodel <- gbmagemodel
+mymodel <- gbm51
 
+
+#mymodel <-currbestgbm
 #mymodel <- rfagemodel61
 md <- md[, colnames(md) %in% mymodel$coefnames]
 
@@ -115,6 +117,10 @@ limrange <- max(abs(md2$diff))
 
 round(wilcox.test(md2$un[md2$good], md2$re[md2$good])$p.value,3)
 
+
+round(t.test(md2$un[md2$good], md2$re[md2$good], alternative = "less")$p.value,3)
+
+
 md2$group <- factor(md2$group, levels=md2$group[order(md2$diff)])
 
 ggplot(subset(md2, md2$good), aes(x=group, y=diff, fill=dir)) +
@@ -155,7 +161,7 @@ md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
 
 md <- md[,colnames(md) %in% mymodel$coefnames]
 
-mymodel <- currbest
+#mymodel <- currbestgbm
 
 
 md$rfagepred <- predict(mymodel, newdata= md)
