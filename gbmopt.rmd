@@ -48,7 +48,7 @@ md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 
 md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
 
-md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.04]
+md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
 md <- md[, colnames(md) %in% c(minf$name[minf$in61==T], "predage")]
 
 
@@ -59,16 +59,46 @@ md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
   filter(!(is.na(predage))) %>%
   column_to_rownames(var="sample")
 
+md1 <- subset(md, md$predage < quantile(md$predage)[2])
+trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
+c1<- md1[trainchoice,]
 
-trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
+md1 <- subset(md, md$predage < quantile(md$predage)[3] & md$predage >= quantile(md$predage)[2])
+trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
+c2<- md1[trainchoice,]
 
 
-trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
-trdat <- md[trainchoice,]
-tedat <- md[-trainchoice,]
+md1 <- subset(md, md$predage < quantile(md$predage)[4]& md$predage >= quantile(md$predage)[3])
+trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
+c3<- md1[trainchoice,]
 
 
-gbmagemodel <- train(
+md1 <- subset(md, md$predage >= quantile(md$predage)[4])
+
+trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
+c4<- md1[trainchoice,]
+
+# 
+# trainchoice <- sample(1:nrow(md1))[1:floor(4*(nrow(md1)/5))]
+# 
+# trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
+# 
+
+
+# 
+# 
+# #trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+# trdat <- md[trainchoice,]
+
+trdat <- rbind(c1, c2, c3, c4)
+  
+  
+  
+#tedat <- substr(md, !(rownames(md) %in% ))
+```
+```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+gbmagemodelnew <- train(
   predage~.,
   tuneLength = 4,
   data = trdat, 
@@ -78,10 +108,25 @@ gbmagemodel <- train(
                        shrinkage = c(0.0001,.001, 0.01, 0.1) ,
                        n.minobsinnode = c(2,3,4,5,6,7)),
   trControl =  trainControl(method = 'cv', 
-                            number = 5, 
+                            number = 7, 
                             summaryFunction=defaultSummary, 
                             verboseIter = T)
 )
+
+# 
+# 
+# train.formula(form = predage ~ ., 
+#               data = trdat, 
+#               tuneLength = 4, 
+#     method = "gbm", 
+#     tuneGrid = expand.grid(
+#       n.trees = (0:50) *         100, 
+#         interaction.depth = c(1, 2, 3, 4, 5), 
+#       shrinkage = c(1e-04, 
+#         0.001, 0.01, 0.1), 
+#       n.minobsinnode = c(2, 3, 4, 5, 6, 
+#         7)), trControl = trainControl(method = "cv", number = 7, 
+#         summaryFunction = defaultSummary, verboseIter = T))
 ```
 
 
@@ -91,53 +136,8 @@ gbmagemodel <- train(
 ```{r gbm plot, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
-pdf("gbm1params.pdf",height=10, width=14)
-
-plot(gbmagemodel1)
-
-dev.off()
-
-
-
-pdf("gbm2params.pdf",height=10, width=14)
-
-plot(gbmagemodel2)
-
-dev.off()
-
-pdf("gbm3params.pdf",height=10, width=14)
-
-plot(gbmagemodel3)
-
-dev.off()
-
-pdf("gbm4params.pdf",height=10, width=14)
-
-plot(gbmagemodel4)
-
-dev.off()
-
-pdf("gbm5params.pdf",height=10, width=14)
-
-plot(gbmagemodel5)
-
-dev.off()
-
-
-
-
-
-pdf("gbm6params.pdf",height=10, width=14)
-
-plot(gbmagemodel6)
-
-dev.off()
-
-pdf("gbmoldparams.pdf",height=10, width=14)
-
 plot(gbmagemodel)
 
-dev.off()
 #save(gbmagemodel, file="gbmnew.rdata")
 #summary(currbest$finalModel)
 ````
@@ -146,7 +146,7 @@ dev.off()
 mymodel <- currbestgbm
 
 
-mymodel <- gbmagemodel
+mymodel <- gbmagemodelnew
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
@@ -177,6 +177,8 @@ md <- md %>%
 md <- subset(md, !(is.na(md$predage)))
 
 
+#md <- subset(md, md$sample != "Coh9")
+
 RMSEtr <- sqrt(mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
 RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
 
@@ -188,6 +190,10 @@ RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == 
 (restr <- mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
 
 (reste <- mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+
+(res <-  (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   )
+t.test(res, alternative="two.sided")
 
 (p=    ggplot(md, aes(x=predage, y=gbmagepred,colour=intrain))+
   geom_point()+
@@ -221,7 +227,7 @@ RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == 
 mymodel$call
 
 
-save(gbm51, file="gbm51.rdata")
+#save(gbm51, file="gbm51.rdata")
 
 #ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("gbmold.pdf"), useDingbats=FALSE, limitsize = FALSE)
 ```
