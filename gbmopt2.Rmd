@@ -1,0 +1,387 @@
+---
+title: "Gradient boosting"
+output: html_document
+---
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+#Set-up and data import
+library(dplyr)
+library(tibble)
+library(tidyr)
+library(caret)
+library(RColorBrewer)
+library(ggrepel)
+library(gtools)
+#library(FinCal)
+````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+#setwd("~/Documents/nstringjul18")
+load(file="allns_data.rdata")
+load("modelgbm.rdata")
+load("models.rdata")
+load("vardat.rdata")
+
+load(file="qualitydat.rdata")
+load(file="sampleinfo.rdata")
+load(file="markerchoiceinfo.rdata")
+
+
+````
+
+
+```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"&
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+ #                sampleinfo$ctg>2 &
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")
+))
+
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
+md <- md[, colnames(md) %in% c(minf$name[minf$in61==T], "predage")]
+
+
+
+md$sample <- rownames(md)
+
+md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
+  filter(!(is.na(predage))) %>%
+  column_to_rownames(var="sample")
+
+
+````
+
+
+```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+md1 <- subset(md, md$predage < quantile(md$predage)[2])
+trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
+c1<- md1[trainchoice,]
+
+md1 <- subset(md, md$predage < quantile(md$predage)[3] & md$predage >= quantile(md$predage)[2])
+trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
+c2<- md1[trainchoice,]
+
+
+md1 <- subset(md, md$predage < quantile(md$predage)[4]& md$predage >= quantile(md$predage)[3])
+trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
+c3<- md1[trainchoice,]
+
+
+md1 <- subset(md, md$predage >= quantile(md$predage)[4])
+
+trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
+c4<- md1[trainchoice,]
+
+````
+
+
+```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+trdat <- rbind(c1, c2, c3, c4)
+  
+  
+trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+trdat <- md[trainchoice,]
+
+```
+```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+gbmagemodelnew <- train(
+  predage~.,
+  tuneLength = 4,
+  data = trdat, 
+  method = "gbm",metric="Rsquared",
+  
+  tuneGrid=expand.grid(n.trees = (0:50)*100, 
+                       interaction.depth = c(1,2,3,4,5), 
+                       shrinkage = c(0.0001,.001, 0.01, 0.1) ,
+                       n.minobsinnode = c(2,3,4,5,6,7)),
+  trControl =  trainControl(method = 'cv', 
+                            number = 7, 
+                            summaryFunction=defaultSummary, 
+                            verboseIter = T)
+)
+
+# 
+# 
+# train.formula(form = predage ~ ., 
+#               data = trdat, 
+#               tuneLength = 4, 
+#     method = "gbm", 
+#     tuneGrid = expand.grid(
+#       n.trees = (0:50) *         100, 
+#         interaction.depth = c(1, 2, 3, 4, 5), 
+#       shrinkage = c(1e-04, 
+#         0.001, 0.01, 0.1), 
+#       n.minobsinnode = c(2, 3, 4, 5, 6, 
+#         7)), trControl = trainControl(method = "cv", number = 7, 
+#         summaryFunction = defaultSummary, verboseIter = T))
+```
+
+
+
+
+
+```{r gbm plot, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+plot(gbmagemodel)
+
+#save(gbmagemodel, file="gbmnew.rdata")
+#summary(currbest$finalModel)
+````
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+mymodel <- currbestgbm
+mymodel <- gbmagemodel
+mymodel <- gbmrsq
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"&
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+ #                sampleinfo$ctg>2 &
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")
+))
+
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+
+md$gbmagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample")
+
+md <- subset(md, !(is.na(md$predage)))
+
+
+#md <- subset(md, md$sample != "Coh9")
+
+RMSEtr <- sqrt(mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+
+(restr <- sqrt(median( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2)))
+(reste <- sqrt(median( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2)))
+
+
+(restr <- mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+
+(reste <- mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+
+(res <-  (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   )
+t.test(res, alternative="two.sided")
+
+(p=    ggplot(md, aes(x=predage, y=gbmagepred,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression")+
+  geom_smooth(method="lm", colour="black")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used \nRMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3)))+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+                          
+                        
+                          
+                          
+                          ))
+                          
+                          
+                          #as.character(mymodel$bestTune[1:5]))))
+          
+        
+  
+  )#+  facet_wrap(~intrain)
+
+
+
+#save(gbm51, file="gbm51.rdata")
+
+#ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("gbmold.pdf"), useDingbats=FALSE, limitsize = FALSE)
+```
+#Plot residuals
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+md$resid <-md$gbmagepred- md$predage 
+
+inres <- md$resid[md$intrain == T]
+
+
+outres <- md$resid[md$intrain == F]
+
+
+(p=    ggplot(md, aes(x=predage, y=resid,colour=intrain))+
+  geom_bar(stat='identity')+
+  xlab("Age (weeks) from body length") +
+  ylab("Residual")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used \nRMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3)))+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+                          ))
+)
+
+
+rest <- t.test(outres)
+mtres <- mean(outres)
+
+
+(p=    ggplot(md, aes(y=resid,fill=intrain))+
+  geom_boxplot()+
+  xlab("Age (weeks) from body length") +
+  ylab("Residual")+
+  theme_bw()+
+ scale_fill_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+ 
+  ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used \n Mean residual (test):",round(mtres,2),"\n residual one-way t-test pval:", round(rest$p.value, 3)))+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+                          ))
+)
+```
+
+####Variable importance
+
+Variable importance obtained via permutation 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+mymodel <- currbestgbm
+mymodel <- gbmagemodel
+vrimpgbm <- summary(mymodel)
+
+
+vrimpgbm$sname <- substr(vrimpgbm$var,1,2)
+vrimpgbm$sname <- factor(vrimpgbm$sname, levels=vrimpgbm$sname[order(vrimpgbm$rel.inf, decreasing=T)])
+
+(p=ggplot(vrimpgbm, aes(x=sname, y=rel.inf))+
+  theme_bw()+
+  geom_bar(stat="identity", fill="red3")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  xlab("Marker")+
+  ylab("Contribution to model")+
+  ggtitle("Marker contributions", subtitle= paste0("GBM model built with ", length(mymodel$coefnames), " markers"))
+)
+
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.height = 12}
+
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"& 
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") & 
+ #                sampleinfo$ctg>2 & 
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")& 
+  !(sampleinfo$sample %in% c("T","C", "U", "LFPD", "O1a", "SFPA", "LFIB","LFIA","AF", "Coh8"))))
+
+
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+md <- subset(md, rownames(md) %in% sampleinfo$sample[!is.na(sampleinfo$predage)])
+
+md <-  as.data.frame(md/rowMeans(md))
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample") %>%
+  gather(key=marker, value= exp, mymodel$coefnames)%>%
+  left_join(minf, by=c("marker"="name"))%>%
+  left_join(select(vrimpgbm, -sname), by= c("marker"="var"))
+
+md$lab <- paste0(md$sname, ": ", round(md$rel.inf,3))
+
+
+md$lab <- factor(md$lab, levels=unique(md$lab[order(md$rel.inf, decreasing=T)]))
+
+(p=ggplot(md, aes(x=predage, y= exp, colour=dir))+
+  geom_smooth()+
+  geom_point(size=0.5)+
+  theme_bw()+
+  facet_wrap(~lab, scales="free", ncol=3)+
+  scale_colour_brewer(palette="Set1")+
+  xlab("Age (based on body length)")+
+  ylab("Normalised expression")+
+  theme(legend.direction = 'horizontal', legend.position = 'bottom')+
+ 
+  ggtitle("Marker profiles", subtitle= paste0("markers from random forest model built with ", length(mymodel$coefnames), " markers")) )
+
+
+
+
+
+ggsave(plot=p,height=18,width=6,dpi=200, filename=paste("gbmcontribprofiles.pdf"), useDingbats=FALSE, limitsize = FALSE)
+
+
+```
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+vrimp <- left_join(vrimpgbm, vrimprf, by="sname")
+
+ggplot(vrimp, aes(x=rel.inf,y=Overall, label=sname))+
+  theme_bw()+
+  ylab("Random Forest importance")+
+  xlab("GBM relative influence")+
+  scale_y_continuous(trans="log2")+
+  scale_x_continuous(trans="log2")+
+#  scale_y_log10()+
+#  scale_x_log10()+
+  geom_point(size=3, colour="red2")+
+  geom_text_repel()+
+  ggtitle("Marker importance: GBM vs Random Forest", subtitle= paste0("Same ", length(mymodel$coefnames), " markers"))
+
+
+````
