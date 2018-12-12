@@ -51,7 +51,7 @@ md <- as.data.frame(subset(t(ctall.norm),
 
 
 
-mymodel <- gbmnew1
+mymodel <- gbmrsq2
 
 
 #mymodel <-currbestgbm
