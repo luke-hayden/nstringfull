@@ -33,7 +33,11 @@ library(reshape2)
 #setwd("~/Documents/nstringjul18/nstringfull")
 load(file="allns_data.rdata")
 load(file="modelrf.rdata")
+<<<<<<< HEAD
 load(file="modelgbm.rdata")+
+=======
+load(file="modelgbm.rdata")
+>>>>>>> 2abd2310efbabb335c5333aebd2a3be56a81ff82
 load(file="hkdat.rdata")
 load(file="sampleinfo.rdata")
 load(file="goodgroups.rdata")
@@ -42,6 +46,35 @@ load(file="vrimprf.rdata")
 ````
 
 
+<<<<<<< HEAD
+=======
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+#mymodel <- currbestgbm
+mymodel <- gbmcompro
+vrimpgbm <- summary(mymodel)
+
+
+vrimpgbm$sname <- substr(vrimpgbm$var,1,2)
+vrimpgbm$sname <- factor(vrimpgbm$sname, levels=vrimpgbm$sname[order(vrimpgbm$rel.inf, decreasing=T)])
+
+(p=ggplot(vrimpgbm, aes(x=sname, y=rel.inf))+
+  theme_bw()+
+  geom_bar(stat="identity", fill="red3")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))+
+  xlab("Marker")+
+  ylab("Contribution to model")+
+  ggtitle("Marker contributions", subtitle= paste0("GBM model built with ", length(mymodel$coefnames), " markers"))
+)
+top50 <- as.character(vrimpgbm$var[order(vrimpgbm$rel.inf, decreasing =T)][1:50])
+
+contriblist<- as.character(vrimpgbm$var)[vrimpgbm$rel.inf >0]
+
+````
+>>>>>>> 2abd2310efbabb335c5333aebd2a3be56a81ff82
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
@@ -53,7 +86,11 @@ md <- as.data.frame(subset(t(ctall.norm),
                  sampleinfo$type %in% c("O", "Y", "M", "OR", "MR", "YR")
  )))
 
+<<<<<<< HEAD
 mymodel <- gbm51
+=======
+#mymodel <- currbest
+>>>>>>> 2abd2310efbabb335c5333aebd2a3be56a81ff82
 
 #mymodel <- rfagemodel61
 md <- md[, colnames(md) %in% mymodel$coefnames]
@@ -191,6 +228,7 @@ groupmeans <- dplyr::group_by(sm3, group)%>%
                    meandiff = mean(predagediff))
 
 
+<<<<<<< HEAD
 mameans <- dplyr::group_by(sm3, cm)%>%
   dplyr::summarise(meanpredage = mean(predage), 
                    meandiff = mean(predagediff))
@@ -292,12 +330,24 @@ save(sm3, sm4, sm5, file="permsgbm.rdata")
 
 msummar <- group_by(sm4, cm)%>%
   dplyr::summarise(cmmeandiff = mean(meandiff))%>%
+=======
+
+
+
+sm4 <- select(sm3, predage, predagediff, predagecontrol, group, perm, cm) %>%
+  left_join(rvals, by="group")
+
+
+msummar <- group_by(sm4, cm)%>%
+  dplyr::summarise(cmmeandiff = mean(predagediff))%>%
+>>>>>>> 2abd2310efbabb335c5333aebd2a3be56a81ff82
   mutate(dir= cmmeandiff > 0)
 
 sm4 <- left_join(sm4, msummar, by="cm")
 sm4$cm <- factor(sm4$cm, levels=unique(sm4$cm[order(sm4$cmmeandiff)]))
 
 msummar <- mutate(msummar, ma= substr(cm, 1,2)) %>%
+<<<<<<< HEAD
                   left_join(vrimprf, by=c("ma"= "sname"))
 sm4$ma <- substr(sm4$cm,1,2)
 
@@ -318,6 +368,15 @@ scale_fill_brewer(palette="Set1")+
 
 ````
 
+=======
+                  left_join(vrimpgbm, by=c("ma"= "sname"))
+sm4$ma <- substr(sm4$cm,1,2)
+
+#sm4 <-  left_join(sm4,vrimprf, by=c("ma"= "sname"))
+
+sm4 <-  left_join(sm4,vrimpgbm, by=c("ma"= "sname"))
+```
+>>>>>>> 2abd2310efbabb335c5333aebd2a3be56a81ff82
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
@@ -325,9 +384,15 @@ scale_fill_brewer(palette="Set1")+
 
 sm4$ma <- factor(sm4$ma, levels=unique(sm4$ma[order(sm4$cmmeandiff)]))
 
+<<<<<<< HEAD
 sm4$map <- paste0(sm4$ma, "\n", round(sm4$Overall,0))
 
 ggplot(sm4, aes(y=meandiff, x=ma, fill=dir))+
+=======
+#sm4$map <- paste0(sm4$ma, "\n", round(sm4$Overall,0))
+
+ggplot(sm4, aes(y=predagediff, x=ma, fill=dir))+
+>>>>>>> 2abd2310efbabb335c5333aebd2a3be56a81ff82
   geom_boxplot()+
   ylim(-5,5)+
   geom_hline(yintercept = 0)+
@@ -347,6 +412,7 @@ ggplot(sm4, aes(y=meandiff, x=ma, fill=dir))+
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
+<<<<<<< HEAD
 
 
 
@@ -357,6 +423,13 @@ ggplot(msummar, aes(y=cmmeandiff, x= ma,size=Overall, fill=dir))+
 
 
 #  ylim(-5,5)+
+=======
+msummar$ma <- factor(msummar$ma, levels= msummar$ma[order(msummar$cmmeandiff)])
+
+
+ggplot(msummar, aes(y=cmmeandiff, x= ma,size=rel.inf, fill=dir))+
+  geom_point(shape=21)+
+>>>>>>> 2abd2310efbabb335c5333aebd2a3be56a81ff82
   geom_hline(yintercept = 0)+
 #  facet_wrap(~cm)+
   theme_bw()+
@@ -373,19 +446,31 @@ ggplot(msummar, aes(y=cmmeandiff, x= ma,size=Overall, fill=dir))+
 
 
 
+<<<<<<< HEAD
 ggplot(msummar, aes(y=cmmeandiff, x=Overall, fill=dir))+
+=======
+ggplot(msummar, aes(y=cmmeandiff, x=rel.inf, fill=dir))+
+>>>>>>> 2abd2310efbabb335c5333aebd2a3be56a81ff82
   geom_point(shape=21)+
 #  ylim(-5,5)+
   geom_hline(yintercept = 0)+
 #  facet_wrap(~cm)+
   theme_bw()+
+<<<<<<< HEAD
+=======
+  scale_x_continuous(trans="log2")+
+>>>>>>> 2abd2310efbabb335c5333aebd2a3be56a81ff82
   scale_fill_manual(values=c("forest green", "orangered"))+
   ylab("Distance from midpoint between regenerated and contralateral sample")+
   xlab("Marker importance")+
   ggtitle("Which markers rejuvenate?", 
           subtitle= paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used\n", 
                            nperm, " permutations"))+
+<<<<<<< HEAD
   geom_smooth(aes(y=cmmeandiff, x=Overall), inherit.aes=F, method="lm", se=F)
+=======
+  geom_smooth(aes(y=cmmeandiff, x=rel.inf), inherit.aes=F, method="lm", se=F)
+>>>>>>> 2abd2310efbabb335c5333aebd2a3be56a81ff82
 # 
 # ggplot(sm4, aes(y=meandiff, x=Overall, fill=dir))+
 #   geom_point(alpha=0.02)+
@@ -404,7 +489,11 @@ ggplot(msummar, aes(y=cmmeandiff, x=Overall, fill=dir))+
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
+<<<<<<< HEAD
 sm4$ma <- factor(sm4$ma, levels=unique(sm4$ma[order(sm4$Overall)]))
+=======
+sm4$ma <- factor(sm4$ma, levels=unique(sm4$ma[order(sm4$rel.inf)]))
+>>>>>>> 2abd2310efbabb335c5333aebd2a3be56a81ff82
 
 (p=ggplot(sm4, aes(y=meandiff, x=ma, fill=dir))+
   geom_boxplot()+
@@ -430,10 +519,17 @@ sm4$ma <- factor(sm4$ma, levels=unique(sm4$ma[order(sm4$Overall)]))
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
+<<<<<<< HEAD
 sm4$ma <- factor(sm4$ma, levels=unique(sm4$ma[order(sm4$Overall)]))
 
 ggplot(sm4, aes(y=meandiff, x=ma, fill=dir))+
     geom_point(aes(y=cmmeandiff))
+=======
+sm4$ma <- factor(sm4$ma, levels=unique(sm4$ma[order(sm4$rel.inf)]))
+
+ggplot(sm4, aes(y=meandiff, x=ma, fill=dir))+
+    geom_point(aes(y=cmmeandiff))+
+>>>>>>> 2abd2310efbabb335c5333aebd2a3be56a81ff82
   geom_boxplot()+
   ylim(-5,5)+
   geom_hline(yintercept = 0)+

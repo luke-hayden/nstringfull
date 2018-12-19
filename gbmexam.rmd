@@ -16,6 +16,7 @@ library(caret)
 library(RColorBrewer)
 library(ggrepel)
 library(gtools)
+library(Rmisc)
 #library(FinCal)
 ````
 
@@ -32,127 +33,35 @@ load("vardat.rdata")
 load(file="qualitydat.rdata")
 load(file="sampleinfo.rdata")
 load(file="markerchoiceinfo.rdata")
+
+load(file="gbmnew.rdata")
+
+
+load(file="gbmrsq.rdata")
+
 ````
 
 
-```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
-#               sampleinfo$qual == "ok"&
-                 sampleinfo$prep== "Luke"&
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
- #                sampleinfo$ctg>2 &
-                sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$type %in% c("O", "Y", "M")
-))
-
-md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
-
-md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
-md <- md[, colnames(md) %in% c(minf$name[minf$in61==T], "predage")]
 
 
-
-md$sample <- rownames(md)
-
-md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
-  filter(!(is.na(predage))) %>%
-  column_to_rownames(var="sample")
-
-md1 <- subset(md, md$predage < quantile(md$predage)[2])
-trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
-c1<- md1[trainchoice,]
-
-md1 <- subset(md, md$predage < quantile(md$predage)[3] & md$predage >= quantile(md$predage)[2])
-trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
-c2<- md1[trainchoice,]
-
-
-md1 <- subset(md, md$predage < quantile(md$predage)[4]& md$predage >= quantile(md$predage)[3])
-trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
-c3<- md1[trainchoice,]
-
-
-md1 <- subset(md, md$predage >= quantile(md$predage)[4])
-
-trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
-c4<- md1[trainchoice,]
-
-trdat <- rbind(c1, c2, c3, c4)
-# 
-# trainchoice <- sample(1:nrow(md1))[1:floor(4*(nrow(md1)/5))]
-# 
-# trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
-# 
-
-
-# 
-# 
-trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
-trdat <- md[trainchoice,]
-
-  
-  
-  
-#tedat <- substr(md, !(rownames(md) %in% ))
-```
-```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-
-gbmagemodelnew <- train(
-  predage~.,
-  tuneLength = 4,
-  data = trdat, 
-  metric="Rsquared",
-  method = "gbm",
-  tuneGrid=expand.grid(n.trees = (0:50)*100, 
-                       interaction.depth = c(1,2,3,4,5), 
-                       shrinkage = c(0.0001,.001, 0.01, 0.1) ,
-                       n.minobsinnode = c(2,3,4,5,6,7)),
-  trControl =  trainControl(method = 'cv', 
-                            number = 7, 
-                            summaryFunction=defaultSummary, 
-                            verboseIter = T)
-)
-
-# 
-# 
-# train.formula(form = predage ~ ., 
-#               data = trdat, 
-#               tuneLength = 4, 
-#     method = "gbm", 
-#     tuneGrid = expand.grid(
-#       n.trees = (0:50) *         100, 
-#         interaction.depth = c(1, 2, 3, 4, 5), 
-#       shrinkage = c(1e-04, 
-#         0.001, 0.01, 0.1), 
-#       n.minobsinnode = c(2, 3, 4, 5, 6, 
-#         7)), trControl = trainControl(method = "cv", number = 7, 
-#         summaryFunction = defaultSummary, verboseIter = T))
-```
-
-
-
-
+#Plot model params
 
 ```{r gbm plot, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
-plot(gbmagemodel)
+plot(gbmagemodelnew)
 
 #save(gbmagemodel, file="gbmnew.rdata")
 #summary(currbest$finalModel)
 ````
 
+#Plot age regeression
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 mymodel <- currbestgbm
 
+gbmagemodelnew<- gbmrsq3
 
-<<<<<<< HEAD
-mymodel <- gbm51
-=======
 mymodel <- gbmagemodelnew
->>>>>>> 313c1b72a3e6b7bf61c3b59fd94fbcc85e1b282b
-
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
                  sampleinfo$prep== "Luke"&
@@ -229,12 +138,70 @@ t.test(res, alternative="two.sided")
   
   )#+  facet_wrap(~intrain)
 
-mymodel$call
 
 
-#save(gbm51, file="gbm51.rdata")
+#p4<-p
+
+
+save(gbmcompro, file="gbmcompro.rdata")
 
 #ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("gbmold.pdf"), useDingbats=FALSE, limitsize = FALSE)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+multiplot(p1, p2, p3, p4, cols=2)
+```
+#Plot residuals
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+md$resid <-md$gbmagepred- md$predage 
+
+inres <- md$resid[md$intrain == T]
+
+
+outres <- md$resid[md$intrain == F]
+
+
+(p=    ggplot(md, aes(x=predage, y=resid,colour=intrain))+
+  geom_bar(stat='identity')+
+  xlab("Age (weeks) from body length") +
+  ylab("Residual")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used \nRMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3)))+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+                          ))
+)
+
+
+rest <- t.test(outres)
+mtres <- mean(outres)
+
+
+(p=    ggplot(md, aes(y=resid,fill=intrain))+
+  geom_boxplot()+
+  xlab("Age (weeks) from body length") +
+  ylab("Residual")+
+  theme_bw()+
+ scale_fill_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+ 
+  ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used \n Mean residual (test):",round(mtres,2),"\n residual one-way t-test pval:", round(rest$p.value, 3)))+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+                          ))
+)
 ```
 
 ####Variable importance
@@ -245,9 +212,7 @@ Variable importance obtained via permutation
 
 
 mymodel <- currbestgbm
-mymodel <- gbm51
-
-#mymodel <- gbmagemodel
+mymodel <- gbmrsq
 vrimpgbm <- summary(mymodel)
 
 
@@ -262,6 +227,9 @@ vrimpgbm$sname <- factor(vrimpgbm$sname, levels=vrimpgbm$sname[order(vrimpgbm$re
   ylab("Contribution to model")+
   ggtitle("Marker contributions", subtitle= paste0("GBM model built with ", length(mymodel$coefnames), " markers"))
 )
+top50 <- as.character(vrimpgbm$var[order(vrimpgbm$rel.inf, decreasing =T)][1:50])
+
+contriblist<- as.character(vrimpgbm$var)[vrimpgbm$rel.inf >0]
 
 ````
 

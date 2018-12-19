@@ -51,9 +51,7 @@ md <- as.data.frame(subset(t(ctall.norm),
 
 
 
-mymodel <- gbmrsq2
-
-
+mymodel <- gbmagemodelnew
 #mymodel <-currbestgbm
 #mymodel <- rfagemodel61
 md <- md[, colnames(md) %in% mymodel$coefnames]
