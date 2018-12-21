@@ -78,6 +78,7 @@ md1 <- subset(md, md$predage >= quantile(md$predage)[4])
 trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
 c4<- md1[trainchoice,]
 
+trdat <- rbind(c1, c2, c3, c4)
 # 
 # trainchoice <- sample(1:nrow(md1))[1:floor(4*(nrow(md1)/5))]
 # 
@@ -87,10 +88,9 @@ c4<- md1[trainchoice,]
 
 # 
 # 
-# #trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
-# trdat <- md[trainchoice,]
+trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+trdat <- md[trainchoice,]
 
-trdat <- rbind(c1, c2, c3, c4)
   
   
   
@@ -102,6 +102,7 @@ gbmagemodelnew <- train(
   predage~.,
   tuneLength = 4,
   data = trdat, 
+  metric="Rsquared",
   method = "gbm",
   tuneGrid=expand.grid(n.trees = (0:50)*100, 
                        interaction.depth = c(1,2,3,4,5), 
@@ -146,7 +147,11 @@ plot(gbmagemodel)
 mymodel <- currbestgbm
 
 
+<<<<<<< HEAD
+mymodel <- gbm51
+=======
 mymodel <- gbmagemodelnew
+>>>>>>> 313c1b72a3e6b7bf61c3b59fd94fbcc85e1b282b
 
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
@@ -240,7 +245,9 @@ Variable importance obtained via permutation
 
 
 mymodel <- currbestgbm
-mymodel <- gbmagemodel
+mymodel <- gbm51
+
+#mymodel <- gbmagemodel
 vrimpgbm <- summary(mymodel)
 
 
