@@ -17,6 +17,7 @@ library(gtools)
 #library(FinCal)
 library(ggrepel)
 library(reshape2)
+library(gbm)
 
 
 
@@ -38,6 +39,7 @@ load(file="hkdat.rdata")
 load(file="sampleinfo.rdata")
 load(file="goodgroups.rdata")
 load(file="vrimprf.rdata")
+load(file="gbmcompro.rdata")
 
 ````
 
@@ -103,7 +105,7 @@ colnames(mreguns) <- c("sample", "marker", "exp")
 #Perm matrix
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-nperm <- 200
+nperm <- 800
 
 mm3<- data.frame(matrix(ncol = 4, nrow = 0))
 colnames(mm3) <- c( "group" , "marker" ,"choice" ,"perm" )
@@ -372,7 +374,7 @@ ggplot(sm4, aes(y=meandiff, x=ma, fill=dir))+
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-save(sm3, sm4, file="permsrf.rdata")
+save(sm3, sm4,msummar, file="permsgbm.rdata")
 
 ````
 
