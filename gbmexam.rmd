@@ -41,7 +41,7 @@ load(file="gbmrmseopt.rdata")
 
 ```{r gbm plot, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 mymodel <- gbmrmseopt
-
+#mymodel <- qualr
 ```
 
 
@@ -108,6 +108,7 @@ t.test(res, alternative="two.sided")
 
 (p=    ggplot(md, aes(x=predage, y=gbmagepred,colour=intrain))+
   geom_point()+
+    geom_text_repel(aes(label=sample))+
   xlab("Age (weeks) from body length") +
   ylab("Age (weeks) from marker gene expression")+
   geom_smooth(method="lm", colour="black")+
@@ -309,3 +310,53 @@ ggplot(vrimp, aes(x=rel.inf,y=Overall, label=sname))+
 
 
 ````
+
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"&
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+ #                sampleinfo$ctg>2 &
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")
+))
+
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample")
+
+
+md$gbmagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- md$sample %in% rownames(mymodel$trainingData)
+
+md$ageresid <- md$wkage - md$predage
+
+md$gbmresid <- md$predage - md$gbmagepred
+
+ggplot(md, aes(md$ageresid,  md$gbmresid ) )+
+  geom_point(aes(colour= intrain))+
+  geom_smooth(method="lm", se=F, colour="black")+
+  theme_bw()+
+#  scale_colour_brewer(palette="Set1")+
+  ylab("Residual variation in GBM (exp v predage)")+
+  xlab("Residual variation in polynomial (len v age)")+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  ggtitle("")
+
+
+```
+
+
