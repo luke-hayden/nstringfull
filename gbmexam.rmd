@@ -108,7 +108,6 @@ t.test(res, alternative="two.sided")
 
 (p=    ggplot(md, aes(x=predage, y=gbmagepred,colour=intrain))+
   geom_point()+
-    geom_text_repel(aes(label=sample))+
   xlab("Age (weeks) from body length") +
   ylab("Age (weeks) from marker gene expression")+
   geom_smooth(method="lm", colour="black")+
@@ -148,6 +147,49 @@ p3<-p
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+md <- subset(md, is.na(md$wkage) ==F)
+
+
+RMSEtr <- sqrt(mean( (md$gbmagepred[md$intrain == T] - as.numeric(md$wkage[md$intrain == T]) )  ^2))
+RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] -  as.numeric(md$wkage[md$intrain == F]))   ^2))
+
+
+(p=    ggplot(md, aes(x=predage, y=wkage,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) cohort age data") +
+  ylab("Age (weeks) from marker gene expression")+
+  geom_smooth(method="lm", colour="black")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used \nRMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3)))+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+                          
+                        
+                          
+                          
+                          ))
+                          
+                          
+                          #as.character(mymodel$bestTune[1:5]))))
+          
+        
+  
+  )
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
 pdf("gbmcomp", height=12, width=16)
 multiplot(p1, p2, p3, p4, cols=2)
 dev.off()
@@ -349,7 +391,7 @@ md$gbmresid <- md$predage - md$gbmagepred
 ggplot(md, aes(md$ageresid,  md$gbmresid ) )+
   geom_point(aes(colour= intrain))+
   geom_smooth(method="lm", se=F, colour="black")+
-  theme_bw()+
+  theme_bw()++
 #  scale_colour_brewer(palette="Set1")+
   ylab("Residual variation in GBM (exp v predage)")+
   xlab("Residual variation in polynomial (len v age)")+
