@@ -1,5 +1,5 @@
 ---
-title: "Gradient boosting"
+title: "Analysis of GBM / random forest models"
 output: html_document
 ---
 
@@ -18,7 +18,6 @@ library(ggrepel)
 library(gtools)
 library(Rmisc)
 library(gbm)
-#library(FinCal)
 ````
 
 
@@ -27,22 +26,23 @@ library(gbm)
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 #setwd("~/Documents/nstringjul18")
 load(file="allns_data.rdata")
-load("modelgbm.rdata")
-load("models.rdata")
 load("vardat.rdata")
 
 load(file="qualitydat.rdata")
 load(file="sampleinfo.rdata")
 load(file="markerchoiceinfo.rdata")
-
-load(file="gbmnew.rdata")
-
-
-load(file="gbmcompro.rdata")
-
+load(file="gbmrsqopt.rdata")
+      
+load(file="gbmrmseopt.rdata") 
+       
+       
 ````
 
 
+```{r gbm plot, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+mymodel <- gbmrmseopt
+#mymodel <- qualr
+```
 
 
 #Plot model params
@@ -50,7 +50,7 @@ load(file="gbmcompro.rdata")
 ```{r gbm plot, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
-plot(gbmagemodelnew)
+plot(mymodel)
 
 #save(gbmagemodel, file="gbmnew.rdata")
 #summary(currbest$finalModel)
@@ -58,11 +58,7 @@ plot(gbmagemodelnew)
 
 #Plot age regression
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
-mymodel <- currbestgbm
 
-#gbmagemodelnew<- gbmrsq3
-
-mymodel <- gbmagemodelnew
 md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
                  sampleinfo$prep== "Luke"&
@@ -151,6 +147,49 @@ p3<-p
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+md <- subset(md, is.na(md$wkage) ==F)
+
+
+RMSEtr <- sqrt(mean( (md$gbmagepred[md$intrain == T] - as.numeric(md$wkage[md$intrain == T]) )  ^2))
+RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] -  as.numeric(md$wkage[md$intrain == F]))   ^2))
+
+
+(p=    ggplot(md, aes(x=predage, y=wkage,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) cohort age data") +
+  ylab("Age (weeks) from marker gene expression")+
+  geom_smooth(method="lm", colour="black")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used \nRMSE in training data: ", round(RMSEtr,3), 
+                          "\nRMSE in test data: ", round(RMSEte,3)))+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+                          
+                        
+                          
+                          
+                          ))
+                          
+                          
+                          #as.character(mymodel$bestTune[1:5]))))
+          
+        
+  
+  )
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
 pdf("gbmcomp", height=12, width=16)
 multiplot(p1, p2, p3, p4, cols=2)
 dev.off()
@@ -313,3 +352,53 @@ ggplot(vrimp, aes(x=rel.inf,y=Overall, label=sname))+
 
 
 ````
+
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+#               sampleinfo$qual == "ok"&
+                 sampleinfo$prep== "Luke"&
+                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+ #                sampleinfo$ctg>2 &
+                sampleinfo$codeset == "phaw_1" &
+                 sampleinfo$type %in% c("O", "Y", "M")
+))
+
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+md <- md %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfo,  by="sample")
+
+
+md$gbmagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- md$sample %in% rownames(mymodel$trainingData)
+
+md$ageresid <- md$wkage - md$predage
+
+md$gbmresid <- md$predage - md$gbmagepred
+
+ggplot(md, aes(md$ageresid,  md$gbmresid ) )+
+  geom_point(aes(colour= intrain))+
+  geom_smooth(method="lm", se=F, colour="black")+
+  theme_bw()++
+#  scale_colour_brewer(palette="Set1")+
+  ylab("Residual variation in GBM (exp v predage)")+
+  xlab("Residual variation in polynomial (len v age)")+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  ggtitle("")
+
+
+```
+
+
