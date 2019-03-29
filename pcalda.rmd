@@ -1,0 +1,213 @@
+---
+title: "PCA vs LDA"
+author: "Luke Hayden"
+date: "29th March 2019"
+output: html_document
+---
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+library(dplyr)
+library(ggbiplot)
+library(tibble)
+library(tidyr)
+library(caret)
+library(RColorBrewer)
+library(ggrepel)
+library(gtools)
+library(MASS)
+````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+#setwd("~/Documents/nstringjul18")
+load(file="allns_data.rdata")
+load(file="markerchoiceinfo.rdata")
+
+load(file="qualitydat.rdata")
+load(file="sampleinfo.rdata")
+
+````
+
+
+
+Old vs young as main groups
+
+#PCA old vs young
+For comparative purposes
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+log <- sampleinfo$reg == "" & 
+  !(sampleinfo$age %in% c("N", "M")) & 
+  sampleinfo$sample %in% qualsum$sample[qualsum$good] & 
+  sampleinfo$sex == "F"&
+  sampleinfo$exp %in% c("OvY", "Size-age") & 
+  sampleinfo$ctg > 2 &
+  sampleinfo$prep == "Luke"
+
+bcmin <- as.matrix(ctall.norm[,log== TRUE])
+bcmin.groups <- subset(sampleinfo$type, log==TRUE)
+
+tbc <- as.matrix(t(bcmin))
+
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+ggtitle("PCA of Old vs Young (females): 195 markers")+
+    theme_bw() +
+  scale_colour_manual(values= c("cornflower blue",  "red2"))
+
+
+````
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+log <- sampleinfo$reg == "" & 
+  !(sampleinfo$age %in% c("N", "M")) & 
+  sampleinfo$sample %in% qualsum$sample[qualsum$good] & 
+  sampleinfo$sex == "F"&
+  sampleinfo$exp %in% c("OvY", "Size-age") & 
+  sampleinfo$ctg > 2 &
+  sampleinfo$prep == "Luke"
+
+bcmin <- as.matrix(ctallgood.norm[,log== TRUE])
+bcmin.groups <- subset(sampleinfo$type, log==TRUE)
+
+tbc <- as.matrix(t(bcmin))
+
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+ggtitle("PCA of Old vs Young (females): 50 chosen markers")+
+    theme_bw() +
+  scale_colour_manual(values= c("cornflower blue",  "red2"))
+
+
+````
+
+
+
+##LDA
+
+Like PCA, this is also a dimensionality reduction technique and a type of unsupervised machine learning. Given samples from two classes and their values obtained for a set of features (our markers), this method looks to find the axis that best separates these classes, giving each feature a loading. I have run this for the full marker set and for the reduced set. The method works out a way of dividing the classes (linear weighting of each marker's value) and outputs a position along this axis for each sample. 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+log <- sampleinfo$reg == "" & 
+  !(sampleinfo$age %in% c("N", "M")) & 
+  sampleinfo$sample %in% qualsum$sample[qualsum$good] & 
+  sampleinfo$sex == "F"&
+  sampleinfo$exp %in% c("OvY", "Size-age") & 
+  sampleinfo$ctg > 2 &
+  sampleinfo$prep == "Luke"
+
+bcmin <- t(as.matrix(ctall.norm[,log== TRUE])) %>%
+  as.data.frame() %>%
+  rownames_to_column(var= "sample") %>%
+  left_join(dplyr::select(sampleinfo, sample, type), by= "sample") %>%
+  column_to_rownames("sample")
+
+bcmin$type <- factor(bcmin$type)
+
+lda <- lda(formula = type ~ ., 
+         data = bcmin, 
+         prior = c(1,1)/2)#, CV = TRUE)
+
+lp <- predict(object=lda, newdata=dplyr::select(bcmin, -type))
+
+
+
+lpp <- lp$posterior %>%
+  as.data.frame() %>%
+  rownames_to_column(var= "sample") %>%
+  left_join(sampleinfo, by= "sample")
+
+lpp$ldaclass <- lp$class
+lpp$iscorrect <- as.character(lpp$type) == as.character(lpp$ldaclass)
+  
+
+ggplot(lpp, aes(x=O, fill=type))+
+  geom_histogram()+
+  ggtitle("LDA of Old vs Young (females): all 195 markers")+
+    theme_bw() +
+  scale_fill_manual(values= c("cornflower blue",  "red2"), name= "Age category", labels = c("Old", "Young"))+
+  xlab("Old/Young classification posterior probability")
+
+
+ggplot(lpp, aes(y=O,x=type, color=type, shape=iscorrect))+
+  geom_point(size=3, alpha=0.5)+
+  ggtitle("PCA of Old vs Young (females): all 195 markers")+
+    theme_bw() +
+  scale_color_manual(values= c("cornflower blue",  "red2"), name= "Age category", labels = c("Old", "Young"))+
+  scale_shape_manual(values= c(4,16), name= "Accuracy", labels= c("Incorrect", "Correct"))+
+  xlab("Age (weeks) from body length") +
+  ylab("Old/Young classification posterior probability")
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+log <- sampleinfo$reg == "" & 
+  !(sampleinfo$age %in% c("N", "M")) & 
+  sampleinfo$sample %in% qualsum$sample[qualsum$good] & 
+  sampleinfo$sex == "F"&
+  sampleinfo$exp %in% c("OvY", "Size-age") & 
+  sampleinfo$ctg > 2 &
+  sampleinfo$prep == "Luke"
+
+bcmin <- t(as.matrix(ctallgood.norm[,log== TRUE])) %>%
+  as.data.frame() %>%
+  rownames_to_column(var= "sample") %>%
+  left_join(dplyr::select(sampleinfo, sample, type), by= "sample") %>%
+  column_to_rownames("sample")
+
+bcmin$type <- factor(bcmin$type)
+
+lda <- lda(formula = type ~ ., 
+         data = bcmin, 
+         prior = c(1,1)/2)#, CV = TRUE)
+
+lp <- predict(object=lda, newdata=dplyr::select(bcmin, -type))
+
+
+
+lpp <- lp$posterior %>%
+  as.data.frame() %>%
+  rownames_to_column(var= "sample") %>%
+  left_join(sampleinfo, by= "sample")
+
+lpp$ldaclass <- lp$class
+lpp$iscorrect <- as.character(lpp$type) == as.character(lpp$ldaclass)
+  
+
+
+ggplot(lpp, aes(x=O, fill=type))+
+  geom_histogram()+
+  ggtitle("LDA of Old vs Young (females): 50 markers")+
+    theme_bw() +
+  scale_fill_manual(values= c("cornflower blue",  "red2"), name= "Age category", labels = c("Old", "Young"))+
+  xlab("Old/Young classification posterior probability")
+
+
+ggplot(lpp, aes(y=O,x=type, color=type, shape=iscorrect))+
+  geom_point(size=3, alpha=0.5)+
+  ggtitle("PCA of Old vs Young (females): 50 markers")+
+    theme_bw() +
+  scale_color_manual(values= c("cornflower blue",  "red2"), name= "Age category", labels = c("Old", "Young"))+
+  scale_shape_manual(values= c(4,16), name= "Accuracy", labels= c("Incorrect", "Correct"))+
+  xlab("Age (weeks) from body length") +
+  ylab("Old/Young classification posterior probability")
+````
+
+
+##Perspectives
+
+LDA works fairly well, might be a nice panel to put into the paper as illustrative of simpler methods than the ensemble models. Might also have its place in the pipeline in marker choice for models. 
