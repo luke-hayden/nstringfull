@@ -1,0 +1,259 @@
+---
+title: "import"
+author: "Luke Hayden"
+date: "July 20, 2018"
+output: html_document
+---
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+library(NanoStringNorm)
+library(dplyr)
+#library(ggbiplot)
+library(tibble)
+library(tidyr)
+
+````
+
+Important: run imp2.r before this script
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+#load(file="nov17main_data.rdata")
+load(file="markerchoiceinfo.rdata")
+
+````
+
+
+
+#Normalised Fully: Housekeeping.sum
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+ct16and17.norm <- NanoStringNorm(x = ct1617.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ct18and19.norm <- NanoStringNorm(x = ct1819.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ct20and21.norm <- NanoStringNorm(x = ct2021.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ct22and23.norm <- NanoStringNorm(x = ct2223.raw, anno = NA, CodeCount ='sum', Background ="mean", SampleContent ='housekeeping.sum', round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+
+ct1623.norm <- cbind(ct16and17.norm, ct18and19.norm, ct20and21.norm, ct22and23.norm)
+
+
+#rownames(ct1623.norm) <- ct1623.norm$marker
+
+#ct1623.norm$rowname <- NULL
+
+
+
+#save(ct1623.norm, file="allns_data_plus.rdata")
+#load("allns_data_plus.rdata")
+
+```
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+sinew <- read.csv("sinew.csv")
+
+ct1623.norm <- as.data.frame(ct1623.norm)
+
+
+colnames(ct1623.norm) <- sinew$sample[1:ncol(ct1623.norm)]
+
+
+
+```
+
+
+#Internal controls only
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+ct1617.intonly <- NanoStringNorm(x = ct1617.raw, anno = NA, CodeCount ='sum', Background ="mean",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ct1819.intonly <- NanoStringNorm(x = ct1819.raw, anno = NA, CodeCount ='sum', Background ="mean",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ct2021.intonly <- NanoStringNorm(x = ct2021.raw, anno = NA, CodeCount ='sum', Background ="mean",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ct2223.intonly <- NanoStringNorm(x = ct2223.raw, anno = NA, CodeCount ='sum', Background ="mean",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+
+ct1623.intonly <- cbind(ct1617.intonly, ct1819.intonly, ct2021.intonly, ct2223.intonly)
+
+
+rownames(ct1623.intonly) <- rownames(ct1617.intonly)
+
+
+
+colnames(ct1623.intonly) <- colnames(ct1623.norm)
+```
+#Unnormalised
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+ct1617.unnorm <- NanoStringNorm(x = ct1617.raw, anno = NA, CodeCount ='none', Background ="mean",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ct1819.unnorm <- NanoStringNorm(x = ct1819.raw, anno = NA, CodeCount ='none', Background ="mean",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ct2021.unnorm <- NanoStringNorm(x = ct2021.raw, anno = NA, CodeCount ='none', Background ="mean",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+ct2223.unnorm <- NanoStringNorm(x = ct2223.raw, anno = NA, CodeCount ='none', Background ="mean",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+
+
+
+ct1623.unnorm <- cbind(ct1617.unnorm, ct1819.unnorm, ct2021.unnorm, ct2223.unnorm)
+
+
+rownames(ct1623.unnorm) <- rownames(ct1617.unnorm)
+
+
+
+colnames(ct1623.unnorm) <- colnames(ct1623.norm)
+
+```
+
+#Housekeeping
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+
+t <- ct1011.raw
+t$x$CodeClass <- "Endogenous"
+ctg1011.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+hknames <- rownames(ctg1011.matr)[210:214]
+
+
+t <- ct1617.raw
+t$x$CodeClass <- "Endogenous"
+ct1617.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+ct1617.hk <- subset(ct1617.matr, rownames(ct1617.matr) %in% hknames)
+
+
+
+t <- ct1819.raw
+t$x$CodeClass <- "Endogenous"
+ct1819.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+ct1819.hk <- subset(ct1819.matr, rownames(ct1819.matr) %in% hknames)
+
+t <- ct2021.raw
+t$x$CodeClass <- "Endogenous"
+ct2021.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+ct2021.hk <- subset(ct2021.matr, rownames(ct2021.matr) %in% hknames)
+
+t <- ct2223.raw
+t$x$CodeClass <- "Endogenous"
+ct2223.matr <- NanoStringNorm(x = t, anno = NA, CodeCount ='none', Background ="none",OtherNorm = "none", round.values = FALSE, take.log = FALSE,return.matrix.of.endogenous.probes = TRUE);
+ct2223.hk <- subset(ct2223.matr, rownames(ct2223.matr) %in% hknames)
+
+ct1623.hk <-  cbind(ct1617.hk, ct1819.hk, ct2021.hk, ct2223.hk)
+
+
+rownames(ct1623.hk) <- rownames(ct1617.hk)
+
+
+colnames(ct1623.hk) <- colnames(ct1623.norm)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+mhk <- reshape2::melt(ct1623.hk) %>%
+  as.data.frame() %>%
+  mutate(data = "new")
+
+ohk <- reshape2::melt(ctall.hk)%>%
+  as.data.frame() %>%
+  mutate(data = "old")
+
+
+hk <- rbind(mhk, ohk)
+
+
+ggplot(hk, aes(x=data, y=value, colour=data))+ geom_point(alpha=0.1) + scale_y_log10() +facet_wrap(~Var1)
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+ctfull.norm <- rownames_to_column(as.data.frame(ctall.norm) )%>%
+  left_join(rownames_to_column(as.data.frame(ct1623.norm))) %>%
+  column_to_rownames(var="rowname")
+
+
+
+ctfull.unnorm <- rownames_to_column(as.data.frame(ctall.unnorm) )%>%
+  left_join(rownames_to_column(as.data.frame(ct1623.unnorm))) %>%
+  column_to_rownames(var="rowname")
+
+ctfull.intonly <- rownames_to_column(as.data.frame(ctall.intonly) )%>%
+  left_join(rownames_to_column(as.data.frame(ct1623.intonly)))%>%
+  column_to_rownames(var= "rowname")
+
+
+ctfull.hk <- rownames_to_column(as.data.frame(ctall.hk) )%>%
+  left_join(rownames_to_column(as.data.frame(ct1623.hk))) %>%
+  column_to_rownames(var= "rowname")
+
+
+
+sampleinfob <- read.csv("sialplus.csv")
+
+
+
+colnames(ctfull.norm) <- sampleinfob$sample[1:length(colnames(ctfull.norm))]
+
+colnames(ctfull.unnorm) <- sampleinfob$sample[1:length(colnames(ctfull.unnorm))]
+
+colnames(ctfull.intonly) <-  sampleinfob$sample[1:length(colnames(ctfull.norm))]
+
+  
+colnames(ctfull.hk) <-  sampleinfob$sample[1:length(colnames(ctfull.norm))]
+
+
+
+````
+
+
+
+
+
+
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+save(ctfull.norm, codeset,geneinf,ctfull.unnorm,ctfull.intonly ,ctfull.hk, sampleinfob, file="fullns_data.rdata")
+
+
+save(sampleinfob , file="sampleinfob.rdata")
+
+````
+

@@ -33,14 +33,41 @@ load(file="sampleinfo.rdata")
 load(file="markerchoiceinfo.rdata")
 load(file="gbmrsqopt.rdata")
       
+load(file="lena.rdata")
 load(file="gbmrmseopt.rdata") 
        
+load(file="gbmfullrmse3.rdata") 
        
 ````
 
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+sinew <- read.csv("sinew.csv")
 
-```{r gbm plot, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+ct1623.norm <- as.data.frame(ct1623.norm)
+
+
+colnames(ct1623.norm) <- sinew$sample[1:ncol(ct1623.norm)]
+
+
+
+
 mymodel <- gbmrmseopt
+
+csn <- subset(sinew, sinew$reg == "")
+
+
+csn$predage <-  predict(polymod3, newdata=csn)
+
+mnd <- t(ct1623.norm) 
+
+mnd <- subset(mnd, rownames(mnd) %in% csn$sample)
+
+pred <- data.frame(sample = rownames(mnd), pred= predict(mymodel, newdata=mnd))
+
+csn <- left_join(csn, pred, by="sample")
+
+ggplot(csn, aes(x=pred, y=predage, colour=exp)) +geom_point()
+
 #mymodel <- qualr
 ```
 
@@ -59,7 +86,9 @@ plot(mymodel)
 #Plot age regression
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+mymodel <- gbmfullrmse3
+
+md <- as.data.frame(subset(t(ctfull.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
                  sampleinfo$prep== "Luke"&
                  sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
@@ -111,7 +140,7 @@ t.test(res, alternative="two.sided")
   xlab("Age (weeks) from body length") +
   ylab("Age (weeks) from marker gene expression")+
   geom_smooth(method="lm", colour="black")+
-  theme_bw()+
+   theme_bw()+
  scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
   geom_text_repel(aes(label=sample), size=2.5)+
   ggtitle("Using Marker gene expression to predict age", 
@@ -137,7 +166,7 @@ t.test(res, alternative="two.sided")
 
 
 
-p3<-p
+gbmrmse <- p
 
 
 #save(gbmcompro, file="gbmcompro.rdata")

@@ -37,97 +37,49 @@ load(file="markerchoiceinfo.rdata")
 
 ```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
-#               sampleinfo$qual == "ok"&
-                 sampleinfo$prep== "Luke"&
-                 sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
+
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY") &
  #                sampleinfo$ctg>2 &
-                sampleinfo$codeset == "phaw_1" &
-                 sampleinfo$type %in% c("O", "Y", "M")
+                 sampleinfoc$type %in% c("O", "Y", "M")
 ))
 
-md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
-
-md <- md[, lmdf2$in61 ==T & lmdf2$pvalovy < 0.05]
-md <- md[, colnames(md) %in% c(minf$name[minf$in61==T], "predage")]
 
 
 
-md$sample <- rownames(md)
 
-md <- left_join(md, select(sampleinfo, sample, predage), by="sample") %>%
-  filter(!(is.na(predage))) %>%
-  column_to_rownames(var="sample")
+md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
 
-md1 <- subset(md, md$predage < quantile(md$predage)[2])
-trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
-c1<- md1[trainchoice,]
+md <- md[,colnames(md) %in% mymodel$coefnames]
 
-md1 <- subset(md, md$predage < quantile(md$predage)[3] & md$predage >= quantile(md$predage)[2])
-trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
-c2<- md1[trainchoice,]
+md2 <- as.data.frame(md) %>%
+  rownames_to_column(var ="sample") %>%
+  left_join(sampleinfoc, by="sample")
 
+predage <- predict(polymod3, newdata=md2)
 
-md1 <- subset(md, md$predage < quantile(md$predage)[4]& md$predage >= quantile(md$predage)[3])
-trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
-c3<- md1[trainchoice,]
+md$predage <- predage
 
+md <- subset(md, !(is.na(md$predage)))
 
-md1 <- subset(md, md$predage >= quantile(md$predage)[4])
-
-trainchoice <- sample(1:nrow(md1))[1:ceiling(4*(nrow(md1)/5))]
-c4<- md1[trainchoice,]
-
-trdat <- rbind(c1, c2, c3, c4)
-# 
-# trainchoice <- sample(1:nrow(md1))[1:floor(4*(nrow(md1)/5))]
-# 
-# trainchoice <- sample(1:nrow(md))[1:floor(4*(nrow(md)/5))]
-# 
-
-
-# 
-# 
-trainchoice <- rownames(md) %in% rownames(currbest$trainingData)
+trainchoice <-  sample(1:nrow(md))[1:ceiling(4*(nrow(md)/5))]
 trdat <- md[trainchoice,]
+````
 
-  
-  
-  
-#tedat <- substr(md, !(rownames(md) %in% ))
-```
+
 ```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-gbmagemodelnew <- train(
-  predage~.,
-  tuneLength = 4,
-  data = trdat, 
-  metric="Rsquared",
-  method = "gbm",
-  tuneGrid=expand.grid(n.trees = (0:50)*100, 
-                       interaction.depth = c(1,2,3,4,5), 
-                       shrinkage = c(0.0001,.001, 0.01, 0.1) ,
-                       n.minobsinnode = c(2,3,4,5,6,7)),
-  trControl =  trainControl(method = 'cv', 
-                            number = 7, 
-                            summaryFunction=defaultSummary, 
-                            verboseIter = T)
-)
 
-# 
-# 
-# train.formula(form = predage ~ ., 
-#               data = trdat, 
-#               tuneLength = 4, 
-#     method = "gbm", 
-#     tuneGrid = expand.grid(
-#       n.trees = (0:50) *         100, 
-#         interaction.depth = c(1, 2, 3, 4, 5), 
-#       shrinkage = c(1e-04, 
-#         0.001, 0.01, 0.1), 
-#       n.minobsinnode = c(2, 3, 4, 5, 6, 
-#         7)), trControl = trainControl(method = "cv", number = 7, 
-#         summaryFunction = defaultSummary, verboseIter = T))
+gbmfull <- train(form = predage ~ ., data = trdat, tuneLength = 3, 
+    method = "gbm", metric = "Rsquared", tuneGrid = expand.grid(n.trees = (0:50) * 
+        100, interaction.depth = c(1, 2, 3, 4, 5), shrinkage = c(1e-04, 
+        0.001, 0.01, 0.1), n.minobsinnode = c(2, 3, 4, 5, 6, 
+        7)), trControl = trainControl(method = "cv", number = 7, 
+        summaryFunction = defaultSummary, verboseIter = T))
+
+
 ```
 
 

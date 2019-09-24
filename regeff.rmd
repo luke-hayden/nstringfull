@@ -7,16 +7,16 @@ output: html_document
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 library(dplyr)
-library(ggbiplot)
+#library(ggbiplot)
 library(tibble)
 library(tidyr)
 library(caret)
 library(RColorBrewer)
 library(ggrepel)
 library(gtools)
-library(FinCal)
+#library(FinCal)
 library(ggrepel)
-library(e10)
+#library(e10)
 ````
 
 
@@ -25,13 +25,17 @@ library(e10)
 #setwd("~/Documents/nstringjul18/nstringfull")
 load(file="allns_data.rdata")
 load(file="modelrf.rdata")
-load(file="modelgbm.rdata")
+#load(file="modelgbm.rdata")
 load(file="hkdat.rdata")
 load(file="sampleinfo.rdata")
 load(file="qualitydat.rdata")
 
+load("fullns_data.rdata")
+load(file="qualitydat.rdata")
+load(file="qualitydatwnew.rdata")
 
-sik <- left_join(sampleinfo, hkdat, by="sample")
+
+sik <- left_join(sampleinfob, hkdat, by="sample")
 
 ````
 
@@ -42,7 +46,7 @@ sik <- left_join(sampleinfo, hkdat, by="sample")
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-md <- as.data.frame(subset(t(ctall.norm), 
+md <- as.data.frame(subset(t(ctfull.norm), 
                            (sampleinfo$sex == "F" &
                  sampleinfo$exp %in% c("regen") & 
                   sampleinfo$ctg > 5 &
@@ -51,9 +55,7 @@ md <- as.data.frame(subset(t(ctall.norm),
 
 
 
-mymodel <- gbmagemodelnew
-#mymodel <-gbmrsq3
-#mymodel <- rfagemodel61
+mymodel <- gbmrsqopt
 md <- md[, colnames(md) %in% mymodel$coefnames]
 
 
@@ -64,7 +66,7 @@ md$rfagepred <- predict(mymodel, newdata= md)
 
 md$sample <- rownames(md)
 
-md <- left_join(md, sampleinfo, by="sample") %>%
+md <- left_join(md, sampleinfob, by="sample") %>%
   left_join(hkdat, by="sample") 
 
 
@@ -147,7 +149,7 @@ goodgroups<- subset(md2, md2$good)$group
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-md <- as.data.frame(subset(t(ctall.norm), sampleinfo$sex == "F" &
+md <- as.data.frame(subset(t(ctfull.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
                  sampleinfo$prep== "Luke"&
                  sampleinfo$exp %in% c("Size-age", "cohorts", "OvY") &
@@ -166,7 +168,9 @@ md$rfagepred <- predict(mymodel, newdata= md)
 
 md$sample <- rownames(md)
 
-md <- left_join(md, sik, by="sample") %>%
+md <- left_join(md, sik, by="sample") 
+
+#%>%
   filter(!(is.na(predage)))
 
 lm <- lm(rfagepred~predage, data=md)

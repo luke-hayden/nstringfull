@@ -1,0 +1,455 @@
+---
+title: "Quantity has a quality all of its own"
+author: "Luke Hayden"
+date: "October 22nd, 2018"
+output: html_document
+---
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+library(dplyr)
+#library(ggbiplot)
+library(tibble)
+library(tidyr)
+library(reshape2)
+library(matrixStats)
+library(gtools)
+library(GGally)
+library(philentropy)
+library(ggrepel)
+library(Rmisc)
+library(ggbiplot)
+```
+
+#Intro
+
+The quality of the Nanostring samples varies considerably, depending on the quantity of RNA present, extraction quality, Ncounter factors, hybridization success, etc. The Nanostring method includes some internal controls that allow us to exclude some samples, but this is a fairly crude and not very stringent method. More samples than flagged need to be removed. 
+Up to now, I have been using a somewhat ad-hoc approach, removing samples either on the basis of numbers of genes expressed (biased where we are also looking at the expression of the same genes) or simply removing outliers. Now it's time to devise a better approach. As Michalis suggested, I will be using the "housekeeping" genes whcih are used to normalise the samples. 
+
+##Ways of determining quality
+
+-Via expression levels of housekeeping genes
+
+-Via relative levels of housekeeping genes
+Should expect consistent ratios
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+#setwd("~/Documents/nstringjul18")
+load(file="allns_data.rdata")
+load(file="sampleinfo.rdata")
+#load(file="models.rdata")
+load(file="vardat.rdata")
+
+#load(file="qualmod.rdata")
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+mc <- melt(as.matrix(ctfull.norm)/rowMeans(as.matrix(ctfull.norm), na.rm=T))
+colnames(mc) <- c("marker", "sample", "expression")
+mc <- left_join(mc, sampleinfob, by= "sample") %>%
+  mutate(ctgsamp= paste0(ctg,"  ",  sample, ": ", over10reads  ))
+
+
+````
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+hkdat <- as.data.frame(t(ctfull.hk))
+
+nhkdat <- t(ctfull.hk/rowMeans(ctfull.hk))
+
+meds <- colMedians(t(ctfull.hk))
+
+
+hkdat$over1 <- rowSums(hkdat>0)
+hkdat$over3 <- rowSums(t(ctfull.hk)>3)
+
+hkdat$over5 <- rowSums(t(ctfull.hk)>5)
+
+
+hkdat$over10 <- rowSums(t(ctfull.hk)>10)
+
+
+
+hkdat$over20 <- rowSums(t(ctfull.hk)>20)
+
+
+
+hkdat$over40 <- rowSums(t(ctfull.hk)>40)
+
+hkdat$sample <- rownames(hkdat)
+
+hkdat <- left_join(hkdat, sampleinfob)
+
+
+
+
+#hkdat$set <- 
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+isexp <- t(ctfull.norm)
+isexp <- isexp[,colnames(isexp) %in% geneinf$name[geneinf$in61] ]
+
+isexp <- isexp>0
+
+numexp <- rowSums(isexp)
+
+sampleinfod <- sampleinfob
+
+sampleinfod$numexp <- numexp
+
+(dens <- ggplot(sampleinfod, aes(x=numexp, fill=set))+
+  geom_density(alpha=0.5)+
+  theme_bw()+
+  ggtitle("Number of expressed genes")
+
+)
+
+````
+
+
+Anywhere above 5-10 reads starts to look somewhat reasonable here. 
+
+##Using simple cutoffs?
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+#View(hkdat)
+
+mhkd <- gather(hkdat, key="threshold", value="numhk", over1, over3,over5,over10, over20, over40)
+  
+mhkd$threshold <- factor(mhkd$threshold, levels= c("over1", "over3","over5","over10", "over20", "over40"))
+
+
+
+variable_labeller <- function(variable,value){
+  return(variable_names[value])
+}
+
+
+variable_names <- list( "over1"=                   paste("At least 1 read"), 
+ "over3"=                 paste("At least 3 reads"), 
+  "over5"=                paste("At least 5 reads"),
+    "over10" =              paste("At least 10 reads"),
+    "over20" =              paste("At least 20 reads"),
+    "over40" =              paste("At least 40 reads")
+                                     )
+
+
+mhkd2 <- subset(mhkd, !(is.na(mhkd$set)))
+
+(hkg <-ggplot(mhkd2, aes(x=numhk))+
+  facet_grid(set~threshold)+
+  geom_bar(fill="red3")+
+  theme_bw()+
+  xlab("number of Housekeeping genes above threshold")+
+  ylab("Samples"))
+# 
+# 
+# 
+# ggplot(d2, aes(x = factor(groupchange), y = perc, fill = factor(Symscore3))) +
+#   geom_bar(stat="identity", width = 0.7) +
+#   scale_y_continuous(breaks = brks, labels = scales::percent(brks))
+
+```
+
+
+
+
+
+Where should we choose to place our cutoffs?
+
+
+
+
+
+#Housekeeping Gene intercorrelation
+
+Another measure of sample quality are the ratios between housekeeping gene expression levels
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+reorder_cormat <- function(cormat){
+# Use correlation between variables as distance
+dd <- as.dist((1-cormat)/2)
+hc <- hclust(dd)
+cormat <-cormat[hc$order, hc$order]
+}
+
+ get_lower_tri<-function(cormat){
+    cormat[upper.tri(cormat)] <- NA
+    return(cormat)
+  }
+  # Get upper triangle of the correlation matrix
+  get_upper_tri <- function(cormat){
+    cormat[lower.tri(cormat)]<- NA
+    return(cormat)
+  }
+  
+
+mhk <- hkdat[, 1:5]
+
+
+mhk <- mhk[ , order(names(mhk))]
+cormat <- round(cor(mhk),2)  
+  
+cormat <- reorder_cormat(cormat)
+upper_tri <- get_upper_tri(cormat)
+
+mcm <- melt(cormat, na.rm = TRUE)
+
+
+
+ggplot(data = mcm, aes(Var1, Var2, fill = value, label=value))+
+ geom_tile(color = "white")+
+    geom_text(colour="black")+
+ scale_fill_gradient2(low = "red3", high = "cornflower blue", mid = "white", 
+   midpoint = 0.5, limit = c(0,1), space = "Lab", 
+   name="Pearson\nCorrelation") +
+  theme_minimal()+ 
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 12, hjust = 1))+
+ coord_fixed()+
+  xlab("")+
+  ylab("")+
+  ggtitle("Correlation between Housekeeping Genes")
+
+````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+ggpairs(mhk)+
+  theme_bw()+
+  ggtitle("Correlation and pairwise plotting between Housekeeping Genes")
+
+````
+
+##PCA of Housekeeping genes
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+log <-     sampleinfo$flag == FALSE
+
+# 
+# 
+# log <-  
+#   sampleinfo$flag == FALSE
+#log <- TRUE
+
+bcmin <- as.matrix(ctall.hk[,log==T])
+bcmin.groups <- sampleinfo$flag[log==T]
+tbc <- as.matrix(t(bcmin))
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=T, labels=rownames(tbc), groups = bc.groups)+
+  ggtitle("PCA based on housekeeping gene expression")+
+    theme_minimal() +
+  scale_colour_manual(values=c("cornflower blue", "red3", "black"), guide=F)
+
+```
+
+Two extreme outlier samples. Not that these samples  What if we remove them? 
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+log <-   !(sampleinfo$sample %in% c("AG", "AI")) &
+  sampleinfo$flag == FALSE
+
+# 
+# 
+# log <-  
+#   sampleinfo$flag == FALSE
+#log <- TRUE
+
+bcmin <- as.matrix(ctfull.hk[,log==T])
+bcmin.groups <- hkdat$set[log==T]
+tbc <- as.matrix(t(bcmin))
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+(pcahk <- ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=T, labels=rownames(tbc), groups = bc.groups)+
+  ggtitle("PCA based on housekeeping gene expression", 
+          subtitle="old vs new dataset")+
+    theme_minimal() +
+  scale_colour_manual(values=c("cornflower blue", "red3", "black"), guide=F))
+
+
+```
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+#log <-   !(sampleinfo$sample %in% c("AG", "AI")) &
+#  sampleinfo$flag == FALSE
+
+# 
+# 
+# log <-  
+#   sampleinfo$flag == FALSE
+#log <- TRUE
+
+bcmin <- subset(ctfull.norm, rownames(ctfull.norm) %in%  geneinf$name[geneinf$in61])
+  
+bcmin.groups <- hkdat$set
+tbc <- as.matrix(t(bcmin))
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+pca <- ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups = bc.groups)+
+  ggtitle("PCA based on normalised gene expression", 
+          subtitle="61 markers \nold vs new dataset")+
+    theme_minimal() +
+  scale_colour_manual(values=c("cornflower blue", "red3", "black"))
+
+
+```
+
+
+##Chi-square: Observed vs expected proportional expression of Housekeeping genes
+
+Use chi-square tests to compare the proportial expression of 
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+log <-    sampleinfo$flag == FALSE
+
+
+mhk <- as.data.frame(t(ctfull.hk[,log==T])) 
+
+expected <- colSums(mhk)/sum(colSums(mhk))
+
+mhkall <-  as.data.frame(t(ctfull.hk)) 
+
+mhkall <- subset(mhkall, rowSums(mhkall) !=0)
+
+eo <- cbind(mhkall, t(data.frame(expected)))
+
+   # expected proportions
+
+
+chi.result <- apply(eo, 1, function (x) chisq.test(x=x[1:5],p=x[6:10]))
+mhkall$p_value <- unlist(lapply(chi.result, function(x) x$p.value))
+
+mhkall$chistat <- unlist(lapply(chi.result, function(x) x$statistic))
+
+mhkall$flag <- rownames(mhkall) %in% sampleinfo$sample[sampleinfo$flag==T]
+mhkall$sample <- rownames(mhkall)
+
+mhkall <- left_join(mhkall, hkdat)
+
+ggplot(mhkall, aes(x=chistat,fill=set))+
+  geom_density(alpha=0.5)+
+  theme_bw()+
+scale_fill_brewer(palette="Set1", name="Sample flagged?")+
+  xlab("Chi-stat (proportional expression of housekeeping genes)")+
+  ggtitle("Deviation from observed/expected")
+ # scale_x_continuous(trans="log2")
+
+
+
+
+
+````
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+ggplot(mhkall, aes(x=chistat,y=p_value,colour=set, label=sample))+
+  geom_point()+
+#  geom_text_repel()+
+  theme_bw()+
+scale_colour_brewer(palette="Set1", name="Sample flagged?")+
+  xlab("Chi-stat (proportional expression of housekeeping genes)")+
+  scale_x_log10()+
+  ggtitle("Deviation from observed/expected")
+
+````
+
+Results are very significant, but we don't want to be so stringent as to remove all samples with a statistically sound deviation from average ratios, we just need to remove the worst sample
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.height = 20}
+mhkall$sample <- factor(mhkall$sample, levels=mhkall$sample[order(mhkall$chistat)])
+
+
+(p=ggplot(mhkall, aes(y=chistat,x=sample, fill=set))+
+  geom_bar(stat="identity")+
+coord_flip()+
+  theme_bw()+
+  ylab("Chi-square stat (deviation from expected housekeeping ratio)")+
+scale_fill_brewer(palette="Set1"))+
+  ggtitle("Ranking deviation from observed/expected")#+  theme(axis.text.y = element_text(angle = 0, hjust =0, size=3)))
+#  scale_x_log10()
+
+chimhkall <-mhkall
+#ggsave(plot=p, filename = "chi.pdf", height=13, width=4)
+
+chi <- p
+
+
+
+save(pca,hkg, pcahk, chi, gbmrmse, gbmrsq,gbmfrm,reg, dens, file="graphs.rdata")
+````
+
+
+Here, we can simply add a cut-off on the basis of this Chi-statistic. Note that our previous "weird outliers" are thrown out by this measure. 
+
+#Proposals
+
+I propose the following cutoffs: 
+
+-Sample unflagged by internal controls
+
+-At least 1 housekeeping genes expressed with at least 10 reads each
+
+-Chi-stat under 1000 for housekeeping gene ratios 
+
+
+This is quite stringent, cutting samples available down to:  
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+qualsum <- select(mhkall, sample, chistat,over3, over5, over10,over20, over40, flag, set)
+
+qualsum$good <- qualsum$chistat <500& qualsum$over10 >=1 & qualsum$flag ==F
+
+qualsum$good2 <- qualsum$chistat <500& qualsum$over3 >=3 & qualsum$over10 >=1 &qualsum$flag ==F
+
+#qualsum$good <- qualsum$chistat <500& qualsum$over10 >=1 & qualsum$flag ==F
+
+length(qualsum$sample[qualsum$good2 &qualsum$set == "new"])
+
+```
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+
+save(qualsum,hkdat,  file="qualitydatwnew.rdata")
+
+
+```
+(Out of 180 samples)
+

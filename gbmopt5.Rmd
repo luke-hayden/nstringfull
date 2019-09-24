@@ -1,0 +1,104 @@
+---
+title: "gbmfullopt5"
+author: "Luke Hayden"
+date: "16 September 2019"
+output: html_document
+---
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+#Set-up and data import
+library(dplyr)
+library(tibble)
+library(tidyr)
+library(caret)
+library(RColorBrewer)
+library(ggrepel)
+library(gtools)
+#library(FinCal)
+````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+#setwd("~/Documents/nstringjul18")
+load(file="allns_data.rdata")
+load("vardat.rdata")
+
+load(file="qualitydat.rdata")
+load(file="sampleinfo.rdata")
+load(file="markerchoiceinfo.rdata")
+
+load(file="gbmrsqopt.rdata")
+      
+load(file="lena.rdata")
+load(file="gbmrmseopt.rdata") 
+load("fullns_data.rdata")
+load(file="qualitydat.rdata")
+load(file="qualitydatwnew.rdata")
+
+````
+
+#Choose model samples
+```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+sampleinfob <- read.csv("sialplus.csv")
+
+
+mymodel <- gbmrmseopt
+
+
+sampleinfoc <- subset(sampleinfob, sampleinfob$sample %in% colnames(ctfull.norm))
+
+
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY") &
+ #                sampleinfo$ctg>2 &
+                 sampleinfoc$type %in% c("O", "Y", "M")
+))
+
+md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+
+md2 <- as.data.frame(md) %>%
+  rownames_to_column(var ="sample") %>%
+  left_join(sampleinfoc, by="sample")
+
+predage <- predict(polymod3, newdata=md2)
+
+md$predage <- predage
+md <- subset(md, !(is.na(md$predage)))
+
+
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+trainchoice <- sample(1:nrow(md))[1:ceiling(4*(nrow(md)/5))]
+
+
+
+trdat<- md[trainchoice,]
+
+
+````
+
+
+```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+gbmfullrsq2 <- train(form = predage ~ ., data = trdat, tuneLength = 4, 
+    method = "gbm",metric = "Rsquared", tuneGrid = expand.grid(n.trees = (0:50) * 
+        100, interaction.depth = c(1, 2, 3, 4, 5), shrinkage = c(1e-04, 
+        0.001, 0.01, 0.1), n.minobsinnode = c(2, 3, 4, 5, 6, 
+        7)), trControl = trainControl(method = "cv",number = 5, 
+        summaryFunction = defaultSummary, verboseIter = F))
+
+
+
+save(gbmfullrsq2, file="gbmfullrsq2.rdata")
+```

@@ -1,0 +1,123 @@
+---
+title: "Extra dataset: initial analyses"
+author: "Luke Hayden"
+date: "4 September 2019"
+output: html_document
+---
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+load("graphs.rdata")
+```
+
+#Background
+
+91 new samples:
+
+- Large individuals
+
+- Regenerated & unregenerated paired samples given both shorter and longer times to regenerate (5 & 10 weeks, respectively)
+
+
+
+#Normalisation
+
+-Using internal controls & housekeeping genes. Normalised by sum of markers. This is as I did it previously. 
+
+#Quality Control
+
+##Housekeeping expression
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+hkg
+```
+
+#Housekeeping ratios
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE, fig.height = 20}
+
+chi
+
+
+```
+
+
+#Addressing quality issues
+
+#Number of expressed markers
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+dens
+```
+
+Many of the new samples have a low number of expressed markers, as seen above. How does this affect their reliability? 
+
+#EDA
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+pca
+```
+
+Despite that, their positioning on a PCA doesn't place them as outliers. This is true whether the PCA is performed using the normalised data (above) or whether it is done using the housekeeping gene values. 
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+pcahk
+```
+
+
+
+
+#Adding to existing models
+
+We can ask our old GBM models to predict age values using the new samples as unseen data. 
+
+##Optimised via RMSE 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+gbmrmse
+
+```
+##Optimised via R2
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+gbmrsq
+```
+
+
+Neither of these two old models produce reliable results when predicting age values using unseen new (validation) data. This may be due to the fact that the region where most of these samples falls has very few samples in the old dataset. Let's buid a new model, using the new data to build the model. 
+
+#New model
+Instead, need to build a new model to get a better bead on predicting age for older samples. 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+gbmfrm
+```
+
+Much better fit. Still needs some optimisation in order to improve the predictive power of the model. 
+
+
+#Regen effect?
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+reg
+```
+
+This is not yet conclusive, as I need to impose a useful quality control threshold to the regeneration dataset in order to be able to rely on that data. 
+
+#Next steps
+
+- Fix quality control
+
+- Adjust normalisation?
+
+- Perform regeneration/rejuvenation analysis on this dataset
+
+
+
