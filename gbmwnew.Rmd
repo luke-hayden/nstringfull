@@ -276,8 +276,7 @@ gbmfrm<-p
 md <- as.data.frame(subset(t(ctfull.norm), 
                 sampleinfoc$sex == "F" &              
                   sampleinfoc$prep== "Luke"&
-                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") &
-                 sampleinfoc$type %in% c("O", "Y", "M")
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") 
 ))
 
 md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
@@ -304,6 +303,19 @@ md$group <- case_when(md$intrain == T ~ "Training Set",
                       md$intrain == F & md$exp %in% c("regen", "regen-long") & md$reg %in% c("R", "R-A") ~ "Regenerated"
 )
 
+mhk2 <- mhk
+mhk2$total <- rowSums(mhk2)
+
+
+mhk2 <- rownames_to_column(mhk2 , var= "sample")
+
+
+
+
+md <- left_join(md, mhk2)
+
+
+
 
 md$resid <- md$predage - md$gbmagepred
 
@@ -321,9 +333,16 @@ ggplot(md, aes(x= group, y=resid, fill=group)) +
 ggplot(md, aes(x=predage, y=gbmagepred,colour=group))+
   geom_point()+
   xlab("Age (weeks) from body length") +
-  ylab("Age (weeks) from marker gene expression")
+  ylab("Age (weeks) from marker gene expression")+
+  theme_bw()
 
 
+
+ggplot(md, aes(y= total,x=resid, colour=group)) +
+  geom_point()+
+  theme_bw()+ 
+  xlab("" ) +
+  ylab("")
 ```
 
 

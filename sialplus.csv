@@ -198,6 +198,7 @@
 197,BR,F,O,,17,,,Size-age,Luke,FALSE,O,?,8.3,phaw_2,new
 198,BS,F,O,,17,,,Size-age,Luke,FALSE,O,?,8.6,phaw_2,new
 199,BT,F,O,,17,,,Size-age,Luke,FALSE,O,?,9.6,phaw_2,new
+200,BU,F,O,,17,,,Size-age,Luke,FALSE,O,?,7.8,phaw_2,new
 201,LAun,F,O,,17,,,regen-long,Luke,FALSE,O,?,7.2,phaw_2,new
 202,LAreg,F,O,R-A,17,,,regen-long,Luke,FALSE,OR-A,?,7.2,phaw_2,new
 203,LBun,F,O,,17,,,regen-long,Luke,FALSE,O,?,7.2,phaw_2,new
@@ -269,4 +270,3 @@
 269,CBun,F,O,,23,,,regen,Luke,FALSE,O,?,7.1,phaw_2,new
 270,CBreg,F,O,R,23,,,regen,Luke,FALSE,OR,?,7.1,phaw_2,new
 271,CCun,F,M,,23,,,regen,Luke,FALSE,M,?,6.2,phaw_2,new
-272,CCreg,F,M,R,23,,,regen,Luke,FALSE,MR,?,6.2,phaw_2,new

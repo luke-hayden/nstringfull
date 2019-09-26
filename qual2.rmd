@@ -437,11 +437,11 @@ qualsum <- select(mhkall, sample, chistat,over3, over5, over10,over20, over40, f
 
 qualsum$good <- qualsum$chistat <500& qualsum$over10 >=1 & qualsum$flag ==F
 
-qualsum$good2 <- qualsum$chistat <500& qualsum$over3 >=3 & qualsum$over10 >=1 &qualsum$flag ==F
+qualsum$good <- qualsum$chistat <500& qualsum$over3 >=3 & qualsum$over10 >=1 &qualsum$flag ==F
 
 #qualsum$good <- qualsum$chistat <500& qualsum$over10 >=1 & qualsum$flag ==F
 
-length(qualsum$sample[qualsum$good2 &qualsum$set == "new"])
+length(qualsum$sample[qualsum$good &qualsum$set == "new"])
 
 ```
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}

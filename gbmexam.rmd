@@ -36,7 +36,7 @@ load(file="gbmrsqopt.rdata")
 load(file="lena.rdata")
 load(file="gbmrmseopt.rdata") 
        
-load(file="gbmfullrmse3.rdata") 
+load(file="gbmfullrmse4.rdata") 
        
 ````
 
@@ -86,7 +86,7 @@ plot(mymodel)
 #Plot age regression
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
-mymodel <- gbmfullrmse3
+mymodel <- gbmfullrmse
 
 md <- as.data.frame(subset(t(ctfull.norm), sampleinfo$sex == "F" &
 #               sampleinfo$qual == "ok"&
