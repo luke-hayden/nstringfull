@@ -447,7 +447,7 @@ length(qualsum$sample[qualsum$good &qualsum$set == "new"])
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
-save(qualsum,hkdat,  file="qualitydatwnew.rdata")
+save(qualsum,hkdat,mhk,  file="qualitydatwnew.rdata")
 
 
 ```

@@ -64,10 +64,10 @@ pcat <- bc.pca$x %>%
   rownames_to_column(var="sample") %>%
   left_join(sampleinfoc, by="sample")
 
-spca <- summary(bc.pca)$importance
+(spca <- summary(bc.pca)$importance)
 
 
-(pcalm <- summary(lm(data=pcat, predage~PC1)))
+(pcalm <- summary(lm(data=pcat, predage~PC1+PC2+PC3+PC4+PC5)))
 
 (
   p= ggplot(pcat, aes(y=PC1, x=predage,label=sample))+
@@ -84,7 +84,31 @@ spca <- summary(bc.pca)$importance
 )
 
 
-ggsave(plot=p,height=8,width=12,dpi=300, device= "png", filename=paste("pca.png"),  bg = "transparent",limitsize = FALSE)
+
+imp <- data.frame( PC = colnames(spca), 
+                   PCdetails = paste0(colnames(spca), ": ",round( spca[2,] *100, 1), "% of variance" ))
+
+
+mpcat <- gather(pcat, key="PC", value="value",c(PC1, PC2, PC3, PC4, PC5, PC6, PC7, PC8, PC9)  ) %>%
+  select(sample, PC, value, predage, qual) %>%
+  left_join(imp)
+
+
+
+(
+  p= ggplot(mpcat, aes(x=predage, y=value))+
+    geom_point()+
+    facet_wrap(~PCdetails)+
+  xlab("Age (weeks) from body length") +
+  ylab("")+
+  ggtitle("Principal components as age predictors")+
+  geom_smooth(method= "lm", se=F)+
+    theme_bw()
+)
+
+
+
+ggsave(plot=p,height=8,width=12,dpi=300, device= "png", filename=paste("pcamulti.png"),  bg = "transparent",limitsize = FALSE)
 
 
 ```

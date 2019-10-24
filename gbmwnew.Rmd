@@ -88,7 +88,7 @@ markexp <-  data.frame( marker = colnames(t(ctfull.norm)),
 
 
 
-mymodel <- gbmrsqopt
+mymodel <- gbmfullrsqinc
 
 
 
@@ -105,14 +105,6 @@ md <- as.data.frame(subset(t(ctfull.norm),
 md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
 
 md <- md[,colnames(md) %in% mymodel$coefnames]
-
-
-thresh <- 20
-
-md <- md[,colnames(md) %in% markexp$marker[markexp$meanexp > thresh]
-
-
-md$gbmagepred <- predict(mymodel, newdata=md)
 
 
 md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
@@ -183,6 +175,46 @@ gbmrsq<-p
 #ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("gbmold.pdf"), useDingbats=FALSE, limitsize = FALSE)
 ```
 
+```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+uns<-  sampleinfoc$sample[
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                  sampleinfoc$reg == "" &
+                 sampleinfoc$exp %in% c("regen", "regen-long") &
+                 sampleinfoc$type %in% c("O", "Y", "M")
+] %>%
+  as.character()
+
+uns <- uns[grepl("un", uns)]
+
+
+names <- substr(uns,1,nchar(uns)-2)
+
+
+regs<-  sampleinfoc$sample[
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                  sampleinfoc$reg %in% c("R", "R-A") &
+                 sampleinfoc$exp %in% c("regen", "regen-long") 
+] %>%
+  as.character()
+
+badregs <- qualsum$sample[
+  qualsum$sample %in% regs &
+  qualsum$good == F
+] %>%
+  as.character()
+
+baduns <- paste0(substr(badregs,1,nchar(badregs)-3), "un")
+
+
+#regs <- substr(regs,1,nchar(regs)-2)
+
+
+
+
+
+````
 
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
@@ -195,7 +227,7 @@ sampleinfoc <- subset(sampleinfob, sampleinfob$sample %in% colnames(ctfull.norm)
 
 
 
-mymodel <- gbmfullrsqinc7
+mymodel <- gbmfullrsqinc13
 #gbmfullrsqinc5
 
 md <- as.data.frame(subset(t(ctfull.norm), 
@@ -206,10 +238,14 @@ md <- as.data.frame(subset(t(ctfull.norm),
                  sampleinfoc$type %in% c("O", "Y", "M")
 ))
 
+md2 <- as.data.frame(subset(t(ctfull.norm),                             sampleinfoc$sample %in% baduns))
+                      
+
+md <- rbind(md, md2)
+
 md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
 
 md <- md[,colnames(md) %in% mymodel$coefnames]
-
 
 
 
@@ -240,9 +276,9 @@ RMSEtr <- sqrt(mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == 
 RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
 
 
-(trgbmlm <- summary(lm(data=md[md$intrain,], predage~gbmagepred)))
-(tegbmlm <- summary(lm(data=md[md$intrain==F], predage~gbmagepred)))
-round(trgbmlm$r.squared, 3)
+#(trgbmlm <- summary(lm(data=md[md$intrain,], predage~gbmagepred)))
+#(tegbmlm <- summary(lm(data=md[md$intrain==F], predage~gbmagepred)))
+#round(trgbmlm$r.squared, 3)
 
 (p=    ggplot(md, 
   aes(x=predage, y=gbmagepred,colour=intrain))+
@@ -394,14 +430,16 @@ ggsave(plot=p1,height=8,width=12,dpi=300, device= "png", filename=paste("trainon
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
+md1 <- subset(md,md$exp %in% c("Size-age", "cohorts", "OvY"))
+
 (p1=
-   ggplot(md, aes(x=predage, y=gbmagepred,colour=group, alpha= group))+
+   ggplot(md1, aes(x=predage, y=gbmagepred,colour=group, alpha= group))+
   geom_point()+
   xlab("Age (weeks) from body length") +
   ylab("Age (weeks) from marker gene expression")+
   theme_bw()+
   scale_colour_manual(values=c("forest green", "cornflower blue", "red3"), name="Sample type", guide=F)+
-  scale_alpha_manual(values= c(0, 1,1), guide=F)+
+#  scale_alpha_manual(values= c(0, 1,1), guide=F)+
    ggtitle("Using Marker gene expression to predict age", 
           subtitle=paste0("Criteria: 4 housekeeping genes over 3 reads, Chi2 < 500", "\nModel type: ", 
                           toupper(mymodel$method), ", ", 
