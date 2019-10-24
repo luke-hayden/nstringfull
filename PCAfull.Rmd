@@ -1,0 +1,180 @@
+---
+title: "PCAfull"
+author: "Luke Hayden"
+date: "1 October 2019"
+output: html_document
+---
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+library(dplyr)
+library(ggbiplot)
+library(tibble)
+library(tidyr)
+library(reshape2)
+library(matrixStats)
+library(gtools)
+library(GGally)
+library(philentropy)
+library(ggrepel)
+library(Rmisc)
+```
+#PCA all
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+sampleinfob <- read.csv("sialplus.csv")
+
+
+
+sampleinfoc <- subset(sampleinfob, sampleinfob$sample %in% colnames(ctfull.norm))
+
+
+
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+       #           sampleinfoc$
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY") &
+                !(is.na(sampleinfoc$length)) &
+                 sampleinfoc$type %in% c("O", "Y", "M")
+))
+
+predage <- predict(polymod3, newdata=sampleinfoc)
+
+sampleinfoc$predage <- predage
+
+log <-     sampleinfob$sample %in% rownames(md)
+
+bcmin <- as.matrix(ctfull.norm[,log==T]) 
+bcmin <- bcmin[  complete.cases(bcmin),]
+bcmin.groups <- sampleinfoc$type[log]
+tbc <- as.matrix(t(bcmin))
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+
+  ggtitle("PCA based on housekeeping gene expression")+
+    theme_minimal() 
+#  scale_colour_manual(values=c("cornflower blue", "red3", "black"), guide=F)
+
+pcat <- bc.pca$x %>%
+  as.data.frame() %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfoc, by="sample")
+
+spca <- summary(bc.pca)$importance
+
+
+(pcalm <- summary(lm(data=pcat, predage~PC1)))
+
+(
+  p= ggplot(pcat, aes(y=PC1, x=predage,label=sample))+
+  geom_point()+
+  geom_smooth(method= "lm", se=F)+
+  theme_bw()+
+  xlab("Age (weeks) from body length") +
+  ylab(paste0("PC1 (", round(spca[2,1] *100, 1), "% of variation) \nfrom marker gene expression"))+
+  ggtitle("PCA to divide old vs young", subtitle = paste0("R-squared: ", round(pcalm$r.squared, 3)))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
+
+)
+
+
+ggsave(plot=p,height=8,width=12,dpi=300, device= "png", filename=paste("pca.png"),  bg = "transparent",limitsize = FALSE)
+
+
+```
+
+
+#PCA train test
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+sampleinfob <- read.csv("sialplus.csv")
+
+
+
+sampleinfoc <- subset(sampleinfob, sampleinfob$sample %in% colnames(ctfull.norm))
+
+
+predage <- predict(polymod3, newdata=sampleinfoc)
+
+sampleinfoc$predage <- predage
+
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+       #           sampleinfoc$
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY") &
+                !(is.na(sampleinfoc$length)) &
+                 sampleinfoc$type %in% c("O", "Y", "M")
+))
+
+
+trainchoice <- sample(1:nrow(md))[1:ceiling(4*(nrow(md)/5))]
+
+md <- md[  complete.cases(md),]
+trdat<- md[trainchoice,]
+tedat<- md[-trainchoice,]
+
+
+log <-     sampleinfob$sample %in% rownames(trdat)
+
+bcmin <- as.matrix(ctfull.norm[,log==T]) 
+
+bcmin.groups <- sampleinfoc$type[log]
+tbc <- as.matrix(t(bcmin))
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+
+  ggtitle("PCA based on housekeeping gene expression")+
+    theme_minimal() 
+#  scale_colour_manual(values=c("cornflower blue", "red3", "black"), guide=F)
+
+
+
+tedat.sc <- scale(tedat, center= bc.pca$center)
+tedat.pred <- tedat.sc %*% bc.pca$rotation 
+tetrpca <- rbind(bc.pca$x, tedat.pred)
+                   
+                   
+
+
+
+pcat <- tetrpca %>%
+  as.data.frame() %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfoc, by="sample")
+
+pcat$intrain <- pcat$sample %in% rownames(trdat)
+
+spca <- summary(bc.pca)$importance
+
+
+(pcalm <- summary(lm(data=pcat, predage~PC1)))
+
+(
+  p= ggplot(pcat, aes(y=PC1, x=predage,label=sample, colour=intrain))+
+  geom_point()+
+  geom_smooth(method= "lm", se=F, inherit.aes = F, aes(y=PC1, x=predage), colour="black")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  xlab("Age (weeks) from body length") +
+  ylab(paste0("PC1 (", round(spca[2,1] *100, 1), "% of variation) \nfrom marker gene expression"))+
+  ggtitle("PCA to divide old vs young", subtitle = paste0("R-squared: ", round(pcalm$r.squared, 3)))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
+
+)
+
+
+ggsave(plot=p,height=8,width=12,dpi=300, device= "png", filename=paste("pcatrte.png"),  bg = "transparent",limitsize = FALSE)
+
+
+```

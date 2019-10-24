@@ -195,7 +195,7 @@ sampleinfoc <- subset(sampleinfob, sampleinfob$sample %in% colnames(ctfull.norm)
 
 
 
-mymodel <- gbmfullrsqinc7
+mymodel <- gbmfullrsqinc
 #gbmfullrsqinc5
 
 md <- as.data.frame(subset(t(ctfull.norm), 
@@ -206,6 +206,10 @@ md <- as.data.frame(subset(t(ctfull.norm),
                  sampleinfoc$type %in% c("O", "Y", "M")
 ))
 
+#md2 <- as.data.frame(subset(t(ctfull.norm),                             sampleinfoc$sample %in% baduns))
+                      
+
+#md <- rbind(md, md2)
 md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
 
 md <- md[,colnames(md) %in% mymodel$coefnames]
@@ -240,9 +244,9 @@ RMSEtr <- sqrt(mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == 
 RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
 
 
-(trgbmlm <- summary(lm(data=md[md$intrain,], predage~gbmagepred)))
-(tegbmlm <- summary(lm(data=md[md$intrain==F], predage~gbmagepred)))
-round(trgbmlm$r.squared, 3)
+#(trgbmlm <- summary(lm(data=md[md$intrain,], predage~gbmagepred)))
+#(tegbmlm <- summary(lm(data=md[md$intrain==F], predage~gbmagepred)))
+#round(trgbmlm$r.squared, 3)
 
 (p=    ggplot(md, 
   aes(x=predage, y=gbmagepred,colour=intrain))+
@@ -320,10 +324,10 @@ md$group <- case_when(md$intrain == T ~ "Training Set",
 
 
 
-md$group <- case_when(md$intrain == T ~ "Training Set", 
-                      md$intrain == F & md$exp %in% c("regen", "regen-long") & md$reg %in% c("R", "R-A") ~ "Regenerated",
-                      md$intrain == F & md$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") ~ "Test Set"
-)
+#md$group <- case_when(md$intrain == T ~ "Training Set", 
+#                      md$intrain == F & md$exp %in% c("regen", "regen-long") & md$reg %in% c("R", "R-A") ~ "Regenerated",
+#                      md$intrain == F & md$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") ~ "Test Set"
+#)
 
 
 mhk2 <- mhk
@@ -348,6 +352,7 @@ md$resid <- md$predage - md$gbmagepred
   xlab("" ) +
 # scale_fill_manual(values=c("forest green", "cornflower blue", "red3"), name="Sample type")+
   ylab("Residual of GBM age vs length-based age (weeks) \n(Negative values indicated regeneration)")
+  
 )
 
 
@@ -363,8 +368,8 @@ ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("regeffbox.pdf"), useDin
   xlab("Age (weeks) from body length") +
   ylab("Age (weeks) from marker gene expression")+
   theme_bw()+
-  scale_colour_manual(values=c("forest green", "cornflower blue", "red3"), name="Sample type", guide=F)+
-  scale_alpha_manual(values= c(0, 0,1), guide=F)+
+  scale_colour_manual(values=c("grey", "forest green", "cornflower blue", "red3"), name="Sample type", guide=F)+
+  scale_alpha_manual(values= c(0, 0,0,1), guide=F)+
    ggtitle("Using Marker gene expression to predict age", 
           subtitle=paste0("Criteria: 4 housekeeping genes over 3 reads, Chi2 < 500", "\nModel type: ", 
                           toupper(mymodel$method), ", ", 
@@ -379,7 +384,7 @@ ggsave(plot=p,height=8,width=12,dpi=200, filename=paste("regeffbox.pdf"), useDin
                           names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
                           names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
  ))+
-  geom_smooth(data=subset(md, md$intrain), method="lm", se=F)+
+  geom_smooth(data=subset(md, md$group == "Training Set"), method="lm", se=F)+
   theme(
     plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
   )
@@ -394,14 +399,19 @@ ggsave(plot=p1,height=8,width=12,dpi=300, device= "png", filename=paste("trainon
 
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
+md$exp %in% c("Size-age", "cohorts", "OvY")
+
+
+md1 <- subset(md,md$exp %in% c("Size-age", "cohorts", "OvY"))
+
 (p1=
-   ggplot(md, aes(x=predage, y=gbmagepred,colour=group, alpha= group))+
+   ggplot(md1, aes(x=predage, y=gbmagepred,colour=group, alpha= group))+
   geom_point()+
   xlab("Age (weeks) from body length") +
   ylab("Age (weeks) from marker gene expression")+
   theme_bw()+
-  scale_colour_manual(values=c("forest green", "cornflower blue", "red3"), name="Sample type", guide=F)+
-  scale_alpha_manual(values= c(0, 1,1), guide=F)+
+  scale_colour_manual(values=c("cornflower blue", "red3"), name="Sample type", guide=F)+
+  scale_alpha_manual(values= c( 1,1), guide=F)+
    ggtitle("Using Marker gene expression to predict age", 
           subtitle=paste0("Criteria: 4 housekeeping genes over 3 reads, Chi2 < 500", "\nModel type: ", 
                           toupper(mymodel$method), ", ", 
@@ -433,17 +443,17 @@ ggsave(plot=p1,height=8,width=12,dpi=300, device= "png", filename=paste("trainte
 
 md$group[md$exp %in% c("regen", "regen-long") & md$reg == ""]  <- "Contralateral"
 
-md$group[md$type %in% c("MR-A", "OR-A")] <- "~12 weeks regenerated"
+#md$group[md$type %in% c("MR-A", "OR-A")] <- "~12 weeks regenerated"
 
 (p1=
    ggplot(md, aes(x=predage, y=gbmagepred,colour=group, alpha= group))+
-  geom_smooth(data=subset(md, md$intrain), method="lm", se=F)+
+  geom_smooth(data=subset(md, md$intrain & md$exp!= "regen"), method="lm", se=F)+
   geom_point()+
   xlab("Age (weeks) from body length") +
   ylab("Age (weeks) from marker gene expression")+
   theme_bw()+
-  scale_colour_manual(values=c("olivedrab3", "grey", "forest green", "cornflower blue", "red3"), name="Sample type", guide=F)+
-  scale_alpha_manual(values= c(1,1, 1,0,0), guide=F)+
+  scale_colour_manual(values=c("grey", "forest green", "cornflower blue", "red3"), name="Sample type", guide=F)+
+  scale_alpha_manual(values= c(1, 1,0,0), guide=F)+
    ggtitle("Using Marker gene expression to predict age", 
           subtitle=paste0("Criteria: 4 housekeeping genes over 3 reads, Chi2 < 500", "\nModel type: ", 
                           toupper(mymodel$method), ", ", 
@@ -479,7 +489,7 @@ sampleinfoc <- subset(sampleinfob, sampleinfob$sample %in% colnames(ctfull.norm)
 
 
 
-mymodel <- gbmfullrmse3
+mymodel <- gbmfullrsqcompro
 
 md <- as.data.frame(subset(t(ctfull.norm), 
                 sampleinfoc$sex == "F" &              
@@ -863,5 +873,6 @@ ggplot(md, aes(md$ageresid,  md$gbmresid ) )+
 
 
 ```
+
 
 

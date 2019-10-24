@@ -1,0 +1,825 @@
+---
+title: "Model Optimisation"
+author: "Luke Hayden"
+date: "3 October 2019"
+output: html_document
+---
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+#Set-up and data import
+library(dplyr)
+library(tibble)
+library(tidyr)
+library(caret)
+library(RColorBrewer)
+library(ggrepel)
+library(gtools)
+library(Rmisc)
+library(gbm)
+library(stringr)
+library(ggbiplot)
+````
+
+#Dataset & Quality control
+
+###Quality cutoffs
+
+- Sample unflagged by internal controls
+
+- At least 4 housekeeping genes expressed with at least 3 reads each
+
+- Chi-stat under 1000 for housekeeping gene ratios 
+
+
+###Modelling approach
+
+- Gradient Boosting Machine
+
+- 80-20 train-test split
+
+- Hyperparameter optimisation via *caret* 
+
+###Factors to be optimised separately
+
+- Cross-validation folds
+
+- Optimisation metric (R-squared vs RMSE)
+
+
+###Factors to consider
+
+- Predictive power (test samples)
+
+- Bias amongst residuals
+
+- Predictive power for contralaterals
+
+
+#Building models with differing training datasets
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+#setwd("~/Documents/nstringjul18")
+load(file="allns_data.rdata")
+load("vardat.rdata")
+load("fullns_data.rdata")
+load(file="qualitydat.rdata")
+load(file="qualitydatwnew.rdata")
+load(file="sampleinfob.rdata")
+load(file="markerchoiceinfo.rdata")
+load(file="lena.rdata")
+       
+load(file="qualitydatwnew.rdata")
+
+
+load(file="gbmfullrsq2.rdata")
+
+load(file="gbmfullrsqinc2.rdata")
+load(file="gbmfullrsqcompro5.rdata")
+````
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+sampleinfoc <- subset(sampleinfob, sampleinfob$sample %in% colnames(ctfull.norm))
+
+
+regs<-  sampleinfoc$sample[
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                  sampleinfoc$reg %in% c("R", "R-A") &
+                 sampleinfoc$exp %in% c("regen", "regen-long") 
+] %>%
+  as.character()
+
+badregs <- qualsum$sample[
+  qualsum$sample %in% regs &
+  qualsum$good == F
+] %>%
+  as.character()
+
+baduns <- paste0(substr(badregs,1,nchar(badregs)-3), "un")
+
+
+```
+
+##Model built without any contralateral samples
+
+This approach is suboptimal in two respects: poorer predictive power amongst the contralaterals and smaller training set. 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+sampleinfob <- read.csv("sialplus.csv")
+
+
+
+sampleinfoc <- subset(sampleinfob, sampleinfob$sample %in% colnames(ctfull.norm))
+
+
+
+mymodel <- gbmfullrsq2
+
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                  sampleinfoc$qual != "bad" &
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY")&
+                 sampleinfoc$type %in% c("O", "Y", "M")
+))
+
+#md2 <- as.data.frame(subset(t(ctfull.norm),                             sampleinfoc$sample %in% baduns))
+                      
+
+#md <- rbind(md, md2)
+
+md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+
+md$gbmagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+md <- as.data.frame(md) %>%
+  rownames_to_column(var ="sample") %>%
+  left_join(sampleinfoc, by="sample")
+
+predage <- predict(polymod3, newdata=md)
+
+md$predage <- predage
+md <- subset(md, !(is.na(md$predage)))
+
+
+md$sub <- ifelse(md$intrain, "train", "test")
+md$sub[md$set == "new"] <- "validation"
+
+
+
+
+
+RMSEtr <- sqrt(mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+
+(p=    ggplot(md, 
+  aes(x=predage, y=gbmagepred,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression")+
+  geom_smooth(data=subset(md, md$intrain), method="lm", se=F)+
+   theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+ geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age \n Criteria: 4 housekeeping genes over 3 reads, Chi2 < 500", 
+          subtitle=paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used ",
+                          "\nTraining data:   RMSE: ", round(RMSEtr,3),#, "         R-squared: ",round(trgbmlm$r.squared, 3),
+                          "\nTest data:         RMSE: ", round(RMSEte,3)#, "     R-squared: ",round(tegbmlm$r.squared, 3)
+                          )
+          )+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+                          ))
+  
+  )
+
+
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") 
+))
+
+md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+md$gbmagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+md <- as.data.frame(md) %>%
+  rownames_to_column(var ="sample") %>%
+  left_join(sampleinfoc, by="sample")
+
+predage <- predict(polymod3, newdata=md)
+
+md$predage <- predage
+md <- subset(md, !(is.na(md$predage)))
+
+md$group <- case_when(md$intrain == T ~ "Training Set", 
+                      md$intrain == F & md$exp %in% c("Size-age", "cohorts", "OvY") ~ "Test Set", 
+                      md$intrain == F & md$exp %in% c("regen", "regen-long") & md$reg == "" ~ "Unamputated",
+                      md$intrain == F & md$exp %in% c("regen", "regen-long") & md$reg %in% c("R", "R-A") ~ "Regenerated"
+)
+
+
+mhk2 <- mhk
+mhk2$total <- rowSums(mhk2)
+
+
+mhk2 <- rownames_to_column(mhk2 , var= "sample")
+
+
+
+
+md <- left_join(md, mhk2)
+
+
+
+
+md$resid <- md$predage - md$gbmagepred
+
+p= ggplot(md, aes(x= group, y=resid, fill=group)) +
+  geom_boxplot()+
+  theme_bw()+ 
+  xlab("" ) +
+  ylab("Residual of GBM age vs length-based age (weeks) \n(Negative values indicated regeneration)")
+  
+
+md$group[md$exp %in% c("regen", "regen-long") & md$reg == ""]  <- "Contralateral"
+
+md1 <- subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") | md$sample %in% baduns)
+
+md$group[md$exp %in% c("regen", "regen-long") & md$reg == ""]  <- "Contralateral"
+
+#md$group[md$type %in% c("MR-A", "OR-A")] <- "~12 weeks regenerated"
+
+(p1=
+   ggplot(md, aes(x=predage, y=gbmagepred,fill=group,colour=intrain, alpha= group))+
+  geom_smooth(data=subset(md, md$intrain & md$exp!= "regen"),colour="red3", method="lm", se=F)+
+  geom_point(shape=21)+
+  scale_colour_manual(values= c("black", "white"),guide=F)+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression")+
+  theme_bw()+
+  scale_fill_manual(values=c("grey", "forest green", "cornflower blue", "red3"), name="Sample type")+#, guide=F)+
+  scale_alpha_manual(values= c(1, 1,0,0), guide=F)+
+   ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("Criteria: 4 housekeeping genes over 3 reads, Chi2 < 500", "\nModel type: ", 
+                          toupper(mymodel$method), ", ", 
+                          length(mymodel$coefnames), 
+                          " markers used \nRMSE in training data: ", 
+                          round(RMSEtr,3), 
+                          "\nRMSE in test data: ", 
+                          round(RMSEte,3)))+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+ ))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )+
+    guides(fill = guide_legend(override.aes = list(linetype = 0)))
+
+)
+
+
+
+
+```
+
+##Model built with contralaterals fully integrated
+
+This model loses the nice paired control effect of the regenerated vs contralateral design. 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+sampleinfob <- read.csv("sialplus.csv")
+
+
+
+sampleinfoc <- subset(sampleinfob, sampleinfob$sample %in% colnames(ctfull.norm))
+
+
+
+mymodel <- gbmfullrsqinc2
+
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                  sampleinfoc$qual != "bad" &
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY")&
+                 sampleinfoc$type %in% c("O", "Y", "M")
+))
+
+md2 <- as.data.frame(subset(t(ctfull.norm),                             sampleinfoc$sample %in% baduns))
+                      
+
+md <- rbind(md, md2)
+
+md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+
+md$gbmagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+md <- as.data.frame(md) %>%
+  rownames_to_column(var ="sample") %>%
+  left_join(sampleinfoc, by="sample")
+
+predage <- predict(polymod3, newdata=md)
+
+md$predage <- predage
+md <- subset(md, !(is.na(md$predage)))
+
+
+md$sub <- ifelse(md$intrain, "train", "test")
+md$sub[md$set == "new"] <- "validation"
+
+
+
+
+
+RMSEtr <- sqrt(mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+
+(p=    ggplot(md, 
+  aes(x=predage, y=gbmagepred,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression")+
+  geom_smooth(data=subset(md, md$intrain), method="lm", se=F)+
+   theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+#  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age \n Criteria: 4 housekeeping genes over 3 reads, Chi2 < 500", 
+          subtitle=paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used ",
+                          "\nTraining data:   RMSE: ", round(RMSEtr,3),#, "         R-squared: ",round(trgbmlm$r.squared, 3),
+                          "\nTest data:         RMSE: ", round(RMSEte,3)#, "     R-squared: ",round(tegbmlm$r.squared, 3)
+                          )
+          )+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+                          ))
+  
+  )
+
+
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") 
+))
+
+md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+md$gbmagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+md <- as.data.frame(md) %>%
+  rownames_to_column(var ="sample") %>%
+  left_join(sampleinfoc, by="sample")
+
+predage <- predict(polymod3, newdata=md)
+
+md$predage <- predage
+md <- subset(md, !(is.na(md$predage)))
+
+md$group <- case_when(md$intrain == T ~ "Training Set", 
+                      md$intrain == F & md$exp %in% c("Size-age", "cohorts", "OvY") ~ "Test Set", 
+                      md$intrain == F & md$exp %in% c("regen", "regen-long") & md$reg == "" ~ "Unamputated",
+                      md$intrain == F & md$exp %in% c("regen", "regen-long") & md$reg %in% c("R", "R-A") ~ "Regenerated"
+)
+
+
+mhk2 <- mhk
+mhk2$total <- rowSums(mhk2)
+
+
+mhk2 <- rownames_to_column(mhk2 , var= "sample")
+
+
+
+
+md <- left_join(md, mhk2)
+
+
+
+
+md$resid <- md$predage - md$gbmagepred
+
+p= ggplot(md, aes(x= group, y=resid, fill=group)) +
+  geom_boxplot()+
+  theme_bw()+ 
+  xlab("" ) +
+  ylab("Residual of GBM age vs length-based age (weeks) \n(Negative values indicated regeneration)")
+  
+
+md$group[md$exp %in% c("regen", "regen-long") & md$reg == ""]  <- "Contralateral"
+
+md1 <- subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") | md$sample %in% baduns)
+
+md$group[md$exp %in% c("regen", "regen-long") & md$reg == ""]  <- "Contralateral"
+
+#md$group[md$type %in% c("MR-A", "OR-A")] <- "~12 weeks regenerated"
+
+(p1=
+   ggplot(md, aes(x=predage, y=gbmagepred,fill=group,colour=intrain, alpha= group))+
+  geom_smooth(data=subset(md, md$intrain & md$exp!= "regen"),colour="red3", method="lm", se=F)+
+  geom_point(shape=21)+
+  scale_colour_manual(values= c("black", "white"),guide=F)+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression")+
+  theme_bw()+
+  scale_fill_manual(values=c("grey", "forest green", "cornflower blue", "red3"), name="Sample type")+#, guide=F)+
+  scale_alpha_manual(values= c(1, 1,0,0), guide=F)+
+   ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("Criteria: 4 housekeeping genes over 3 reads, Chi2 < 500", "\nModel type: ", 
+                          toupper(mymodel$method), ", ", 
+                          length(mymodel$coefnames), 
+                          " markers used \nRMSE in training data: ", 
+                          round(RMSEtr,3), 
+                          "\nRMSE in test data: ", 
+                          round(RMSEte,3)))+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+ ))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )+
+    guides(fill = guide_legend(override.aes = list(linetype = 0)))
+
+)
+
+
+
+
+```
+
+##Compromise approach
+
+For this model, a small number of the contralaterals are included in the training set, but only those few for which a regenerated pair of sufficient quality is unavailable. This "compromise" approach is my preferred solution, as it improves the predictive ability 
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+sampleinfob <- read.csv("sialplus.csv")
+
+
+
+sampleinfoc <- subset(sampleinfob, sampleinfob$sample %in% colnames(ctfull.norm))
+
+
+
+mymodel <- gbmfullrsqcompro5
+
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                  sampleinfoc$qual != "bad" &
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY")&
+                 sampleinfoc$type %in% c("O", "Y", "M")
+))
+
+md2 <- as.data.frame(subset(t(ctfull.norm),                             sampleinfoc$sample %in% baduns))
+                      
+
+md <- rbind(md, md2)
+
+md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+
+
+md$gbmagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+md <- as.data.frame(md) %>%
+  rownames_to_column(var ="sample") %>%
+  left_join(sampleinfoc, by="sample")
+
+predage <- predict(polymod3, newdata=md)
+
+md$predage <- predage
+md <- subset(md, !(is.na(md$predage)))
+
+
+md$sub <- ifelse(md$intrain, "train", "test")
+md$sub[md$set == "new"] <- "validation"
+
+
+
+
+
+RMSEtr <- sqrt(mean( (md$gbmagepred[md$intrain == T] - md$predage[md$intrain == T])   ^2))
+RMSEte <- sqrt(mean( (md$gbmagepred[md$intrain == F] - md$predage[md$intrain == F])   ^2))
+
+
+(p=    ggplot(md, 
+  aes(x=predage, y=gbmagepred,colour=intrain))+
+  geom_point()+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression")+
+  geom_smooth(data=subset(md, md$intrain), method="lm", se=F)+
+   theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+#  geom_text_repel(aes(label=sample), size=2.5)+
+  ggtitle("Using Marker gene expression to predict age \n Criteria: 4 housekeeping genes over 3 reads, Chi2 < 500", 
+          subtitle=paste0("Model type: ", toupper(mymodel$method), ", ", length(mymodel$coefnames), " markers used ",
+                          "\nTraining data:   RMSE: ", round(RMSEtr,3),#, "         R-squared: ",round(trgbmlm$r.squared, 3),
+                          "\nTest data:         RMSE: ", round(RMSEte,3)#, "     R-squared: ",round(tegbmlm$r.squared, 3)
+                          )
+          )+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+                          ))
+  
+  )
+
+
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") 
+))
+
+md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+md$gbmagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+md <- as.data.frame(md) %>%
+  rownames_to_column(var ="sample") %>%
+  left_join(sampleinfoc, by="sample")
+
+predage <- predict(polymod3, newdata=md)
+
+md$predage <- predage
+md <- subset(md, !(is.na(md$predage)))
+
+md$group <- case_when(md$intrain == T ~ "Training Set", 
+                      md$intrain == F & md$exp %in% c("Size-age", "cohorts", "OvY") ~ "Test Set", 
+                      md$intrain == F & md$exp %in% c("regen", "regen-long") & md$reg == "" ~ "Unamputated",
+                      md$intrain == F & md$exp %in% c("regen", "regen-long") & md$reg %in% c("R", "R-A") ~ "Regenerated"
+)
+
+
+mhk2 <- mhk
+mhk2$total <- rowSums(mhk2)
+
+
+mhk2 <- rownames_to_column(mhk2 , var= "sample")
+
+
+
+
+md <- left_join(md, mhk2)
+
+
+
+
+md$resid <- md$predage - md$gbmagepred
+
+p= ggplot(md, aes(x= group, y=resid, fill=group)) +
+  geom_boxplot()+
+  theme_bw()+ 
+  xlab("" ) +
+  ylab("Residual of GBM age vs length-based age (weeks) \n(Negative values indicated regeneration)")
+  
+
+md$group[md$exp %in% c("regen", "regen-long") & md$reg == ""]  <- "Contralateral"
+
+md1 <- subset(md,md$exp %in% c("Size-age", "cohorts", "OvY") | md$sample %in% baduns)
+
+md$group[md$exp %in% c("regen", "regen-long") & md$reg == ""]  <- "Contralateral"
+
+#md$group[md$type %in% c("MR-A", "OR-A")] <- "~12 weeks regenerated"
+
+(p1=
+   ggplot(md, aes(x=predage, y=gbmagepred,fill=group,colour=intrain, alpha= group))+
+  geom_smooth(data=subset(md, md$intrain & md$exp!= "regen"),colour="red3", method="lm", se=F)+
+  geom_point(shape=21)+
+  scale_colour_manual(values= c("black", "white"),guide=F)+
+  xlab("Age (weeks) from body length") +
+  ylab("Age (weeks) from marker gene expression")+
+  theme_bw()+
+  scale_fill_manual(values=c("grey", "forest green", "cornflower blue", "red3"), name="Sample type")+#, guide=F)+
+  scale_alpha_manual(values= c(1, 1,0,0), guide=F)+
+   ggtitle("Using Marker gene expression to predict age", 
+          subtitle=paste0("Criteria: 4 housekeeping genes over 3 reads, Chi2 < 500", "\nModel type: ", 
+                          toupper(mymodel$method), ", ", 
+                          length(mymodel$coefnames), 
+                          " markers used \nRMSE in training data: ", 
+                          round(RMSEtr,3), 
+                          "\nRMSE in test data: ", 
+                          round(RMSEte,3)))+ 
+    labs(caption = paste0("final parameters: ", 
+                          names(mymodel$bestTune)[1], ": ", mymodel$bestTune[1], " ", 
+                          names(mymodel$bestTune)[2], ": ", mymodel$bestTune[2], " ", 
+                          names(mymodel$bestTune)[3], ": ", mymodel$bestTune[3], "  ", 
+                          names(mymodel$bestTune)[4], ": ", mymodel$bestTune[4], ""
+ ))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )+
+    guides(fill = guide_legend(override.aes = list(linetype = 0)))
+
+)
+
+
+
+
+```
+
+#Rejuvenative effect?
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") 
+))
+
+md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+md <- md[,colnames(md) %in% mymodel$coefnames]
+
+md$gbmagepred <- predict(mymodel, newdata=md)
+
+
+md$intrain <- rownames(md) %in% rownames(mymodel$trainingData)
+
+md <- as.data.frame(md) %>%
+  rownames_to_column(var ="sample") %>%
+  left_join(sampleinfoc, by="sample")
+
+predage <- predict(polymod3, newdata=md)
+
+md$predage <- predage
+md <- subset(md, !(is.na(md$predage)))
+
+md$group <- case_when(md$intrain == T ~ "Training Set", 
+                      md$intrain == F & md$exp %in% c("Size-age", "cohorts", "OvY") ~ "Test Set", 
+                      md$intrain == F & md$exp %in% c("regen", "regen-long") & md$reg == "" ~ "Contralateral",
+                      md$intrain == F & md$exp %in% c("regen", "regen-long") & md$reg %in% c("R", "R-A") ~ "Regenerated"
+)
+
+
+
+#md$group <- case_when(md$intrain == T ~ "Training Set", 
+#                      md$intrain == F & md$exp %in% c("regen", "regen-long") & md$reg %in% c("R", "R-A") ~ "Regenerated",
+#                      md$intrain == F & md$exp %in% c("Size-age", "cohorts", "OvY", "regen", "regen-long") ~ "Test Set"
+#)
+
+
+mhk2 <- mhk
+mhk2$total <- rowSums(mhk2)
+
+
+mhk2 <- rownames_to_column(mhk2 , var= "sample")
+
+
+
+
+md <- left_join(md, mhk2)
+
+
+
+
+md$resid <- md$predage - md$gbmagepred
+
+(p= ggplot(md, aes(x= group, y=resid, fill=group)) +
+  geom_boxplot()+
+  theme_bw()+ 
+  xlab("" ) +
+  scale_fill_manual(values=c("grey", "forest green", "cornflower blue", "red3"), name="Sample type")+
+# scale_fill_manual(values=c("forest green", "cornflower blue", "red3"), name="Sample type")+
+  ylab("Residual of length-based age vs expression-based age (weeks) \n(Negative values indicate regeneration)")
+)
+
+
+````
+
+No indications of any meaningful regenerative effect here. 
+
+
+
+#Revisiting PCA
+
+Michalis asked whether PCA can provide much ability to predict age. To test this, I've performed a PCA (with a 80-20 train-test split) and then plotted PC1 against length-based sample age. As
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+sampleinfob <- read.csv("sialplus.csv")
+
+
+
+sampleinfoc <- subset(sampleinfob, sampleinfob$sample %in% colnames(ctfull.norm))
+
+
+predage <- predict(polymod3, newdata=sampleinfoc)
+
+sampleinfoc$predage <- predage
+
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+       #           sampleinfoc$
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY") &
+                !(is.na(sampleinfoc$length)) &
+                 sampleinfoc$type %in% c("O", "Y", "M")
+))
+
+
+trainchoice <- sample(1:nrow(md))[1:ceiling(4*(nrow(md)/5))]
+
+md <- md[  complete.cases(md),]
+trdat<- md[trainchoice,]
+tedat<- md[-trainchoice,]
+
+
+log <-     sampleinfob$sample %in% rownames(trdat)
+
+bcmin <- as.matrix(ctfull.norm[,log==T]) 
+
+bcmin.groups <- sampleinfoc$type[log]
+tbc <- as.matrix(t(bcmin))
+bc.pca <- prcomp(tbc,center = TRUE,scale. = TRUE) 
+bc.groups <- bcmin.groups
+
+
+#ggbiplot(bc.pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, var.axes=F, labels=rownames(tbc), groups=bc.groups)+
+#  ggtitle("PCA based on housekeeping gene expression")+
+ #   theme_minimal() 
+#  scale_colour_manual(values=c("cornflower blue", "red3", "black"), guide=F)
+
+
+
+tedat.sc <- scale(tedat, center= bc.pca$center)
+tedat.pred <- tedat.sc %*% bc.pca$rotation 
+tetrpca <- rbind(bc.pca$x, tedat.pred)
+                   
+                   
+
+
+
+pcat <- tetrpca %>%
+  as.data.frame() %>%
+  rownames_to_column(var="sample") %>%
+  left_join(sampleinfoc, by="sample")
+
+pcat$intrain <- pcat$sample %in% rownames(trdat)
+
+spca <- summary(bc.pca)$importance
+
+
+pcalm <- summary(lm(data=pcat, predage~PC1))
+(
+  p= ggplot(pcat, aes(y=PC1, x=predage,label=sample, colour=intrain))+
+  geom_point()+
+  geom_smooth(method= "lm", se=F, inherit.aes = F, aes(y=PC1, x=predage), colour="black")+
+  theme_bw()+
+ scale_colour_manual(values=c("cornflower blue", "red3"), name="Data partition", labels=c("Test", "Training"))+
+  xlab("Age (weeks) from body length") +
+  ylab(paste0("PC1 (", round(spca[2,1] *100, 1), "% of variation) \nfrom marker gene expression"))+
+  ggtitle("PCA to divide old vs young", subtitle = paste0("Training samples R-squared: ", round(pcalm$r.squared, 3)))+
+  theme(
+    plot.background = element_rect(fill = "transparent",colour = "transparent") # bg of the panel
+  )
+
+)
+
+
+ggsave(plot=p,height=8,width=12,dpi=300, device= "png", filename=paste("pcatrte.png"),  bg = "transparent",limitsize = FALSE)
+
+
+```
