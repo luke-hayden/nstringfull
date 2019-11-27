@@ -1,10 +1,11 @@
-# ReAGE prject main data analysis and modelling
+# ReAGE project main data analysis and modelling
 
-Analysis of four Nanostring datasets from:
+Analysis of five Nanostring datasets from:
 Oct 2016
 Feb 2017
 Nov 2017
 July 2018
+June 2019
 
 Goals:
 -Using Nanostring gene expression data, build machine learning models to predict sample biological age from gene expression. Measure the effect of regeneration on this molcular age. 
@@ -41,15 +42,15 @@ All analyses are carried out in notebooks (Rmarkdown format), with visualisation
 
 Inputs: 
 Large set of Nanostring data in .RCC format. 
-siall.csv: info on samples
+sialplus.csv: info on samples
 zk-age-len.csv: extra age-length data
 
--imp1.r,import.rmd: Parse .rcc files and produce output in readable format 
-      output: all_ns_data.rdata, sampleinfo.rdata
+-imp1.r,imp2.r,import.rmd, import2.rmd: Parse .rcc files and produce output in readable format 
+      output: full_ns_data.rdata, sampleinfo.rdata
       
 -age-len.rmd: model age-body length relationship 
-    input: sampleinfo.rdata
-    output: modified sampleinfo.rdata
+    input: sampleinfob.rdata
+    output: lena.rdata
 
 -agesep.rmd: patterns of variation old v young
     input: sampleinfo.rdata, allns_data.rdata
@@ -59,14 +60,13 @@ zk-age-len.csv: extra age-length data
     input: sampleinfo.rdata, allns_data.rdata
     output: qualitydat.rdata
     
--rfopt.rmd: optimise random forest models 
-    input: sampleinfo.rdata, allns_data.rdata, qualdat.rdata, vardat.rdata, modelrf.rdata (recursive optimisation)
-    output: modelrf.rdata
+-gbmopt.rmd: build/optimise/train GBM models 
+    input: allns_data.rdata,vardat.rdata,markerchoiceinfo.rdata,lena.rdata,fullns_data.rdata,qualitydatwnew.rdata,sialplus.csv
+    output: yourmodelnamehere.rdata
 
--gbmopt.rmd: optimise GBM models 
-    input: sampleinfo.rdata, allns_data.rdata, qualdat.rdata, vardat.rdata, modelrf.rdata,  modelgbm.rdata (recursive optimisation)
-    output: modelgbm.rdata
-    
+-gbmexamclean: analyse & plot models
+	input: allns_data.rdata,vardat.rdata,markerchoiceinfo.rdata,lena.rdata,fullns_data.rdata,qualitydatwnew.rdata,sialplus.csv
+	output: graphs
 
 -regeff.rmd:examine effect of regeneration on age predicted by models
     input: sampleinfo.rdata, allns_data.rdata, qualdat.rdata, vardat.rdata, modelrf.rdata,  modelgbm.rdata 
@@ -75,6 +75,11 @@ All raw data is held in folders with .rcc files
 
 
 ## Samples
+
+June 2019
+91 samples
+Large individuals
+Regenerated & unregenerated paired samples given both shorter and longer times to regenerate (5 & 10 weeks, respectively)
 
 July 2018
 72 samples total, including: 

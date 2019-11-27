@@ -5,6 +5,9 @@ date: "August 3, 2018"
 output: html_document
 ---
 
+This script produces the length-age polynomial model used for later analyses
+
+
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 
 
@@ -13,7 +16,6 @@ library(ggbiplot)
 library(tibble)
 library(tidyr)
 library(caret)
-
 library(gtools)
 
 

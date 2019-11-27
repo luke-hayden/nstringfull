@@ -38,11 +38,10 @@ Should expect consistent ratios
 ```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
 #setwd("~/Documents/nstringjul18")
 load(file="allns_data.rdata")
-load(file="sampleinfo.rdata")
-#load(file="models.rdata")
+load(file="sampleinfob.rdata")
 load(file="vardat.rdata")
 
-#load(file="qualmod.rdata")
+load(file="hkdat.rdata")
 
 ````
 
@@ -411,7 +410,7 @@ chi <- p
 
 
 
-save(pca,hkg, pcahk, chi, gbmrmse, gbmrsq,gbmfrm,reg, dens, file="graphs.rdata")
+#save(pca,hkg, pcahk, chi, gbmrmse, gbmrsq,gbmfrm,reg, dens, file="graphs.rdata")
 ````
 
 
@@ -451,5 +450,5 @@ save(qualsum,hkdat,mhk,  file="qualitydatwnew.rdata")
 
 
 ```
-(Out of 180 samples)
+
 
