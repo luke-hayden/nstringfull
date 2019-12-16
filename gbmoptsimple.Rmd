@@ -1,0 +1,112 @@
+---
+title: "gbmfullopt5"
+author: "Luke Hayden"
+date: "16 September 2019"
+output: html_document
+---
+
+This script is for building GBM models
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+#Set-up and data import
+library(dplyr)
+library(tibble)
+library(tidyr)
+library(caret)
+library(RColorBrewer)
+library(ggrepel)
+library(gtools)
+````
+
+
+
+
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+#setwd("~/Documents/nstringjul18")
+load(file="allns_data.rdata")
+load("vardat.rdata")
+load(file="markerchoiceinfo.rdata")
+load(file="lena.rdata")
+load("fullns_data.rdata")
+load(file="qualitydatwnew.rdata")
+load("gbmfullrsq3.rdata")
+sampleinfob <- read.csv("sialplus.csv")
+````
+
+#Choose model samples
+
+
+
+```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+
+sampleinfob <- read.csv("sialplus.csv")
+
+
+sampleinfoc <- subset(sampleinfob, sampleinfob$sample %in% colnames(ctfull.norm))
+
+markexp <-  data.frame( marker = colnames(t(ctfull.norm)), 
+                        meanexp = colMeans(t(ctfull.norm), na.rm = T))
+
+
+md <- as.data.frame(subset(t(ctfull.norm), 
+                sampleinfoc$sex == "F" &              
+                  sampleinfoc$prep== "Luke"&
+                 sampleinfoc$exp %in% c("Size-age", "cohorts", "OvY") &
+                 sampleinfoc$type %in% c("O", "Y", "M")
+))
+
+md <-subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+#md <- md[complete.cases(t(md)),]
+md <- md[ , colSums(is.na(md)) == 0]
+#md <-select(md, geneinf$name[geneinf$in61 == T])
+
+md2 <- as.data.frame(md) %>%
+  rownames_to_column(var ="sample") %>%
+  left_join(sampleinfoc, by="sample")
+
+predage <- predict(polymod3, newdata=md2)
+
+md$predage <- predage
+md <- subset(md, !(is.na(md$predage)))
+
+
+md <- subset(md, rownames(md)%in% qualsum$sample[qualsum$good])
+
+
+
+
+trainchoice <- sample(1:nrow(md))[1:ceiling(4*(nrow(md)/5))]
+
+
+
+
+trdat<- md[trainchoice,]
+
+```
+
+
+
+```{r Gradient boosting build, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+modelnamehere <- train(
+  form = predage ~ .,
+  data = trdat, 
+  tuneLength = 4, 
+    method = "gbm",
+   metric = "Rsquared", 
+    tuneGrid = expand.grid(
+      n.trees = (0:50) * 100, 
+        interaction.depth = c(1, 2, 3, 4, 5), 
+        shrinkage = c(1e-04, 0.001, 0.01, 0.1), 
+        n.minobsinnode = c(1,2, 3, 4, 5, 6, 7,8,10)
+      ), 
+    trControl = trainControl(
+      method = "cv",
+      number = 6, 
+      summaryFunction = defaultSummary, 
+      verboseIter = F)
+    )
+
+
+```
